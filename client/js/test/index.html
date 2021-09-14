@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>remote shell</title>
+        <style>
+            html{
+                font-size:25px;
+                font-family: 'Courier New', Courier, monospace;
+                background-color: black;
+                color: #ccc;
+            }
+            textarea{
+                font-size:25px;
+                font-family: 'Courier New', Courier, monospace;
+                border-style: none;
+                border-width: 0;
+                background-color: black;
+                color: #ccc;
+                overflow: hidden;
+            }
+            input[type="text"]{
+                font-size:25px;
+                font-family: 'Courier New', Courier, monospace;
+                border-style: none;
+                border-width: 0;
+                background-color: black;
+                color: #ccc;
+            }
+            input[type="checkbox"]{
+                filter:invert(92%);
+            }
+            textarea:focus{
+                width: 95%;
+                font-family: 'Courier New', Courier, monospace;
+                border-style: none;
+                border-width: 0;
+                background-color: black;
+                color: #ccc;
+            }
+            .dark-console{
+                font-family: 'Courier New', Courier, monospace;
+                border-style: none;
+                border-width: 0;
+                background-color: black;
+                color: #ccc;
+            }
+            input[type="text"]:focus{
+                font-family: 'Courier New', Courier, monospace;
+                border-style: none;
+                border-width: 0;
+                background-color: black;
+                color: #ccc;
+            }
+            button{
+                background-color: black;
+                color: #ccc;
+            }
+            #line-1{
+                width: 98%;
+            }
+            #line-3{
+                width: 98%;
+            }
+            #history{
+                width: 98%;
+            }
+            #input{
+                width: 98%;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="line-1">
+            token: <input id="token" class="dark-console" type="text" size="50"/>
+            <input type="checkbox" id="secureCh"/> secure
+            <button onclick="sendToken()">connect</button>
+        </div>
+        <textarea id="history" readonly rows="1"></textarea><br/>
+        <div id="line-3">
+            $<input id="input" class="dark-console" type="text" size="100"/> <button onclick="sendCmd()">exec</button>
+        </div>
+
+      </body>
+        <script>
+            var token = document.getElementById("token");
+            var historyTxt = document.getElementById("history");
+            var input = document.getElementById("input");
+            var secureCh = document.getElementById("secureCh");
+            
+            var testFile={
+                fileIdMap : {},
+                open(path){
+                    return server.openFile(path, 3).then(file=>{
+                        this.fileIdMap[file.id] = file;
+                        this.fileIdMap[path] = file;
+                        return file.id;
+                    });
+                },
+                close(id){
+                    return server.closeFile(this.fileIdMap[id]);
+                },
+                read(id, position, length){
+                    var file = this.fileIdMap[id];
+                    return file.read(position, length).then(arr=>decoder.decode(arr));
+                },
+                write(id, data, position){
+                    var file = this.fileIdMap[id];
+                    data = encoder.encode(data);
+                    return file.write(data, position);
+                },
+                append(id, data){
+                    var file = this.fileIdMap[id];
+                    data = encoder.encode(data);
+                    return file.append(data);
+                },
+                transfer(srcId, destId, srcPosition, destPosition, length){
+                    var srcFile = this.fileIdMap[srcId];
+                    var destFile = this.fileIdMap[destId];
+                    return srcFile.transferTo(destFile,  srcPosition, destPosition, length);
+                },
+                ls(path, verbose){
+                    return server.listdir(path).then(arr => 
+                        arr.map(e => {
+                            if(verbose) return e;
+                            else return e.fileName;
+                        })
+                    ).then(arr => {
+                        if(!verbose) return arr.join(" ");
+                        return arr;
+                    })
+                },
+                curl(...args){
+                    var obj = {};
+                    for(var i=0; i<args.length; i+=2)
+                        obj[args[i]] = args[i+1];
+                    return server.curl(obj)
+                    .then(async arr => {
+                        var result = [];
+                        for(var p of arr){
+                            console.log(p);
+                            var e = await p;
+                            console.log(e);
+                            result.push(`${e.url} ${e.fileName} ${e.contentLength}`);
+                        }
+                        return result.join("\n");
+                    });
+                },
+                fetch(url){
+                    return server.fetch(url)
+                    .then(obj=>{
+                        obj.body = decoder.decode(obj.body);
+                        return printObj(obj);
+                    });
+                },
+                "write-all":async function(path, data){
+                    data = encoder.encode(data);
+                    var file = await server.openFile(path, 66);
+                    await file.write(data);
+                    await server.closeFile(file);
+                },
+                chmod(path, readOnly, lm, la, c){
+                    var obj = {};
+                    if(readOnly != null) obj.readOnly = readOnly !== "0";
+                    if(lm != null) obj.lastModifiedTime = Number.parseInt(lm);
+                    if(la != null) obj.lastAccessTime = Number.parseInt(la);
+                    if(c != null) obj.createTime = Number.parseInt(c);
+                    return server.setAttribute(path, obj);
+                },
+                async test(){
+                    var file = await server.openFile("test.txt", 51);
+                    var file2 = await server.openFile("test2.txt", 51);
+                    file.write(encoder.encode("0000000000"));
+                    file2.write(encoder.encode("00transfer"));
+                    file.write(encoder.encode("111"), 1); //0111000000
+                    file2.transferTo(file, 2, 3, 4); //011tran000
+                    file.append(encoder.encode("aa")); //011tran000aa
+                    var result = file.read();
+                    server.closeFile(file);
+                    server.closeFile(file2);
+                    return result.then(arr=>decoder.decode(arr));
+                }
+            }
+
+            const funcMap = {
+                // ls: "listdir",
+                cwd: "cwd",
+                cd: "chdir",
+                rm: "remove",
+                rmdir: "removeRecursive",
+                mkdir: "mkdir",
+                touch: "createFile",
+                mv: "move",
+                stat: "getFileState",
+                // fetch: "fetch",
+                // test: "test"
+            };
+            var portToConnect = 1234;
+            var cursor = 0;
+            var historyArr = [];
+            var cmdHistory = [];
+            var tempCmd = "";
+            var server = test.server;
+            const encoder = new TextEncoder();
+            const decoder = new TextDecoder();
+
+            function printObj(obj, ind=0){
+                var result = "";
+                 if(obj instanceof Array){
+                    result += "[\r\n";
+                    for(var v of obj){
+                        result += " ".repeat(ind+2);
+                        result += printObj(v, ind+2) + ",\n";
+                    }
+                    result += " ".repeat(ind) + "]";
+                }else if(typeof obj === "object"){
+                    result +="{\r\n";
+                    for(var k in obj){
+                        result += " ".repeat(ind+2);
+                        result += k + ": " + printObj(obj[k], ind+2) + ",\n";
+                    }
+                    result += " ".repeat(ind) + "}";
+                }else result += obj;
+                return result;
+            }
+            function pushHistoryArr(arr){
+                for(var e of arr){
+                    if(e instanceof Array){
+                        var result = "";
+                        for(var f of e){
+                            result += f + " ";
+                        }
+                        pushHistory(result);
+                    }else{
+                        pushHistory(e);
+                    }
+                }
+            }
+            function pushHistory(line){
+                line = line.toString();
+                historyArr.push(line);
+                // historyTxt.rows = historyArr.length;
+                buildHistory();
+            }
+            function buildHistory(){
+                var txt = "";
+                for(var h of historyArr){
+                    txt += h + "\n";
+                }
+                historyTxt.value = txt;
+                historyTxt.rows = (txt.match(/\n/g) || []).length;
+                document.documentElement.scrollTop = historyTxt.scrollHeight;
+                historyTxt.scrollTop = historyTxt.scrollHeight-70;
+            }
+            function sendToken(){
+                test.test(token.value.trim(), portToConnect, secureCh.checked)
+                    .then(()=>{
+                        pushHistory("Connect to server.");
+                    }).catch(e=>pushHistory(e));
+            }
+            token.addEventListener("keydown", function(e){
+                var key = e.key;
+                if(key === "Enter"){
+                    sendToken();
+                }
+            });
+            function sendCmd(){
+                var cmd = input.value;
+                input.value ="";
+                cmdHistory.push(cmd);
+                cursor = cmdHistory.length;
+                pushHistory("$"+cmd);
+                var cmdArr = cmd.split(" ");
+                if(funcMap[cmdArr[0]] == null){
+                    if(testFile[cmdArr[0]] == null)
+                        pushHistory(cmd + ": command not found");
+                    else{
+                        testFile[cmdArr[0]](...cmdArr.slice(1)).then(info => {
+                            if(typeof info === "string") pushHistory(info);
+                            else if(info instanceof Array) pushHistoryArr(info);
+                            else  pushHistory(info.toString());
+                        }).catch(reason => {
+                            if(typeof reason === "string") pushHistory(reason);
+                            else if(reason instanceof Array) pushHistoryArr(reason);
+                            else  pushHistory(reason.toString());
+                        });
+                    }
+                }else{
+                    server[funcMap[cmdArr[0]]](...cmdArr.slice(1)).then(info => {
+                        console.log(info);
+                        if(typeof info === "string") pushHistory(info);
+                        else if(info instanceof Array) pushHistoryArr(info);
+                        else  pushHistory(info.toString());
+                    }).catch(reason => {
+                        if(typeof reason === "string") pushHistory(reason);
+                        else if(reason instanceof Array) pushHistoryArr(reason);
+                        else  pushHistory(reason.toString());
+                    });
+                }
+            }
+            input.addEventListener("keydown", function(e){
+                var key = e.key;
+
+                if(key === "Enter"){
+                    sendCmd();
+                }else if(key === "ArrowUp"){
+                    if(cursor === cmdHistory.length) tempCmd = input.value;
+                    if(cursor > 0) {
+                        cursor--;
+                        input.value = cmdHistory[cursor];
+                    }
+                }else if(key === "ArrowDown"){
+                   
+                    if(cursor < cmdHistory.length-1) {
+                        cursor++;
+                        input.value = cmdHistory[cursor];
+                    }else if(cursor == cmdHistory.length-1){
+                        cursor++;
+                        input.value = tempCmd;
+                    }
+                }
+            });
+        </script>
+    
+</html>

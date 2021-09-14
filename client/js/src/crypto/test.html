@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <script>
+            function download(arr, name){
+                var blob = new Blob([arr], {type: "application/octet-stream"});
+                var url = URL.createObjectURL(blob);
+                var a = document.createElement('a');
+                a.href = url;
+                a.download = name;
+                a.click();
+            }
+            var execTime = {
+                tag:null,
+                time:0,
+                start(tag){
+                    if(this.tag !== null) this.end();
+                    this.tag = tag;
+                    this.time = new Date().getTime();
+                },
+                end(){
+                    console.info(this.tag, new Date().getTime() - this.time);
+                    this.tag = null;
+                }
+            };
+        </script>
+        <script src="./AesCtr.js"></script>
+        <script src="./RSA.js"></script>
+    </head>
+    <body>
+        <script>
+            var key = new Uint8Array([1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]);
+            var aesEnc = new AesCtr(key);
+            var aesDec = new AesCtr(key);
+            var data = [1,2,3,4,5,6,7,8,9];
+            var encrypted = aesEnc.encrypt(data);
+            var decrypted = aesDec.decrypt(encrypted);
+            console.log(data, encrypted, decrypted);
+        </script>
+        <!-- <script>
+            var blob = new Blob([
+                document.querySelector('#worker').textContent
+            ], { type: "text/javascript" })
+
+            // Note: window.webkitURL.createObjectURL() in Chrome 10+.
+            var worker = new Worker(window.URL.createObjectURL(blob));
+        </script> -->
+    </body>
+</html>
