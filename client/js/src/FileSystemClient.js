@@ -40,6 +40,14 @@ export class RemoteFile{
     _idBytes = null;
     fileSystemClient = null;
     
+    /**
+     * While write or transfer data to the server, these operations will be blocked in
+     * buffer. After period of time or specific number of operations, buffer will 
+     * automatically flush and send these operations to server.
+     * If RemoteFile.flush called, buffer will flush immediately.
+     * @param {FileSystemClient} fileSystemClient 
+     * @returns {Promise<number>} Number of flushed operations.
+     */
     static flush(fileSystemClient){
         if(RemoteFile.isFlushed === true) return;
         RemoteFile.isFlushed = true;
@@ -106,6 +114,7 @@ export class RemoteFile{
         return payloadList;
     }
     
+    
 
     constructor(id, fileSystemClient){
         this.fileSystemClient = fileSystemClient;
@@ -115,7 +124,10 @@ export class RemoteFile{
     }
 
     
-
+    _pushOperationBuffer(list){
+        RemoteFile.operationBuffer.push(list);
+        if(RemoteFile.operationBuffer.length >= 250) this.flush();
+    }
     _futureData(){
         if(RemoteFile.isFlushed == true) {
             RemoteFile.flushTimeout = setTimeout(() => {
@@ -131,11 +143,10 @@ export class RemoteFile{
     }
 
     _readAll(){
-
-        RemoteFile.operationBuffer.push([RemoteFile.OPERATION_READ_ALL, this._idBytes.slice()]);
+        this._pushOperationBuffer([RemoteFile.OPERATION_READ_ALL, this._idBytes.slice()]);
     }
     _readRange(position, length){
-        RemoteFile.operationBuffer.push([
+        this._pushOperationBuffer([
             RemoteFile.OPERATION_READ_ALL,
             this._idBytes.slice(),
             longToByteArray(position),
@@ -144,7 +155,7 @@ export class RemoteFile{
     }
 
     _transferRange(destIdBytes, srcPosition, destPosition, length){
-        RemoteFile.operationBuffer.push([
+        this._pushOperationBuffer([
             RemoteFile.OPERATION_TRANSFER_RANGE,
             this._idBytes.slice(),
             destIdBytes,
@@ -155,7 +166,7 @@ export class RemoteFile{
     }
 
     _writeAll(data){
-        RemoteFile.operationBuffer.push([
+        this._pushOperationBuffer([
             RemoteFile.OPERATION_OVERWRITE_ALL,
             this._idBytes.slice(),
             longToByteArray(data.byteLength),
@@ -163,7 +174,7 @@ export class RemoteFile{
         ]);
     }
     _writeRange(position, data){
-        RemoteFile.operationBuffer.push([
+        this._pushOperationBuffer([
             RemoteFile.OPERATION_OVERWRITE_RANGE,
             this._idBytes.slice(),
             longToByteArray(position),
@@ -172,7 +183,7 @@ export class RemoteFile{
         ]);
     }
     _appendAll(data){
-        RemoteFile.operationBuffer.push([
+        this._pushOperationBuffer([
             RemoteFile.OPERATION_APPEND,
             this._idBytes.slice(),
             longToByteArray(data.byteLength),
@@ -180,16 +191,38 @@ export class RemoteFile{
         ]);
     }
 
+     /**
+     * Read a section of data and write it to other file.
+     * @param {RemoteFile} destFile File to write.
+     * @param {number} srcPosition Start position in file that is to be read.
+     * @param {number} destPosition Position which data will be write, which in file that is to be write.
+     * @param {number} length Length of data to be read and write.
+     * @returns Length of bytes transferred.
+     */
     transferTo(destFile, srcPosition, destPosition, length){
         this._transferRange(destFile._idBytes, srcPosition, destPosition, length);
         return this._futureData();
     }
 
+    /**
+     * Write a section of data that read from other file.
+     * @param {RemoteFile} srcFile File to read.
+     * @param {number} srcPosition Start position in file that is to be read.
+     * @param {number} destPosition Position which data will be write, which in file that is to be write.
+     * @param {number} length Length of data to be read and write.
+     * @returns Length of bytes transferred.
+     */
     transferFrom(srcFile, srcPosition, destPosition, length){
         srcFile._transferRange(this._idBytes, srcPosition, destPosition, length);
         return this._futureData();
     }
 
+    /**
+     * Read section of data from the file. If both position and length are null, then read entire file.
+     * @param {number} position Position where data will be read.
+     * @param {number} length Length of data to be read.
+     * @returns {Promise<Uint8Array>}
+     */
     read(position=null, length=null){
         if(position == null && length == null)
             this._readAll();
@@ -198,19 +231,39 @@ export class RemoteFile{
         return this._futureData();
     }
 
+    /**
+     * Write data to the file. If position not specified, then position will be zero.
+     * @param {Uint8Array} data 
+     * @param {number} position The number of bytes from the beginning of the file which data will be write. 
+     * @returns {Promise<number>} Length of bytes written.
+     */
     write(data, position=null){
         if(position == null)
             this._writeAll(data);
         else this._writeRange(position, data);
         return this._futureData();
     }
+
+    /**
+     * Write data to the end of file.
+     * @param {Uint8Array} data
+     * @returns {Promise<number>} Length of bytes written.
+     */
     append(data){
         this._appendAll(data);
         return this._futureData();
     }
 
+    /**
+     * While write or transfer data to the server, these operations will be blocked in
+     * buffer. After period of time or specific number of operations, buffer will 
+     * automatically flush and send these operations to server.
+     * If RemoteFile.flush called, buffer will flush immediately.
+     * 
+     * @returns {Promise<number>} Number of flushed operations.
+     */
     flush(){
-        RemoteFile.flush(this.fileSystemClient );
+        return RemoteFile.flush(this.fileSystemClient );
     }
 
     close(){
@@ -246,6 +299,14 @@ export class FileSystemClient{
 
     }
 
+    /**
+     * Connect to server.
+     * 
+     * @param {string} host Host of server.
+     * @param {string} token Token generated by server.
+     * @param {boolean} secure If true, the data will be encrypted.
+     * @returns {Promise<undefined>}
+     */
     connect(host, token, secure = true){
         if(secure){
             return this.verifyClient.establishSecureConnect(host, token)
@@ -280,14 +341,29 @@ export class FileSystemClient{
             result = this.connectContext.request([new Uint8Array([code]), ...body]);
         return result.then(arr=>FileSystemClient._solveFileResult(arr)[2]);
     }
+    /**
+     * Get current working directory.
+     * @returns {Promise<string>}
+     */
     cwd(){
         return this._send(FileSystemClient.CWD)
             .then(arr=>this._dec.decode(arr));
     }
+
+    /**
+     * Change current working directory.
+     * @returns {Promise<null>}
+     */
     chdir(path){
         return this._send(FileSystemClient.CHDIR, this._enc.encode(path))
-            .then(arr=>this._dec.decode(arr));
+            .then(arr=>null);
     }
+
+    /**
+     * Directory listing.
+     * @param {string} path Directory to list. If path is empty, then list current working directory.
+     * @returns {Promise<RemoteFileAttribute[]>}
+     */
     listdir(path=null){
         var result;
         if(path == null)
@@ -299,26 +375,64 @@ export class FileSystemClient{
             .then(str=>JSON.parse(str))
             .then(arr=>arr.map(e=>new RemoteFileAttribute(e)));;
     }
+
+    /**
+     * Remove file or directory.
+     * @param {string} path File or directory to remove.
+     * @returns {Promise<null>}
+     */
     remove(path){
         return this._send(FileSystemClient.REMOVE, this._enc.encode(path))
-        .then(arr=>this._dec.decode(arr));
+        .then(arr=>null);
     }
-    removeRecursive(path){
+
+    /**
+     * Remove directory recursively.
+     * @param {string} path Directory to remove.
+     * @returns {Promise<null>}
+     */
+    removeRecursively(path){
         return this._send(FileSystemClient.RMDIR, this._enc.encode(path))
-        .then(arr=>this._dec.decode(arr));
+        .then(arr=>null);
     }
+
+    /**
+     * Create directory.
+     * @param {string} path Directory to create.
+     * @returns {Promise<null>}
+     */
     mkdir(path){
         return this._send(FileSystemClient.MKDIR, this._enc.encode(path))
-        .then(arr=>this._dec.decode(arr));
+        .then(arr=>null);
     }
+
+    /**
+     * Create file.
+     * @param {string} path File to create.
+     * @returns {Promise<null>}
+     */
     createFile(path){
         return this._send(FileSystemClient.MKFILE, this._enc.encode(path))
-        .then(arr=>this._dec.decode(arr));
+        .then(arr=>null);
     }
+
+    /**
+     * Move file.
+     * @param {string} from Source path to move.
+     * @param {string} to Destination path to move. 
+     * @returns {Promise<null>}
+     */
     move(from, to){
         return this._send(FileSystemClient.MOVE, this._enc.encode(from + "|" + to))
-        .then(arr=>this._dec.decode(arr));
+        .then(arr=>null);
     }
+
+    /**
+     * Get some attribute of file or directory, for example, is exists, is readable, etc.
+     * @param {string} path Path of file.
+     * @param {boolean} verbose If true, returns a verbose result.
+     * @returns {Promise<RemoteFileAttribute>}
+     */
     getFileState(path, verbose=false){
         var mode = verbose ?
              FileSystemClient.FILE_STATE : FileSystemClient.FILE_STATE_SIMPLE;
@@ -328,6 +442,13 @@ export class FileSystemClient{
             .then(list=>new RemoteFileAttribute(list));
         
     }
+
+    /**
+     * Open a file in server, and returns RemoteFile for operation,
+     * @param {string} path File to open.
+     * @param {number} mode Open mode defined in RemoteFile, OPEN_MODE_READ, OPEN_MODE_WRITE, etc.
+     * @returns {Promise<RemoteFile>}
+     */
     openFile(path, mode){
         var futureId = this._send(FileSystemClient.OPEN_FILE, new Uint8Array([mode]), this._enc.encode(path))
         .then(arr=>this._dec.decode(arr));
@@ -335,23 +456,35 @@ export class FileSystemClient{
             return new RemoteFile(id, this);
         });
     }
+
+    /**
+     * Close RemoteFile.
+     * @param {RemoteFile} file File to close.
+     * @returns {Promise<null>}
+     */
     closeFile(file){
         return this._send(FileSystemClient.CLOSE_FILE, this._enc.encode(file.id))
-        .then(arr=>this._dec.decode(arr));
+        .then(arr=>null);
     }
 
     _fileOp(...payload){
         return this.connectContext.request([new Uint8Array([FileSystemClient.FILE_OP]), ...payload]);
     }
 
+    /**
+     * Download and save files from url.
+     * @param { {[key:string]: string}} urlFileNamePairs Key of the object is file name, and value of object is url.
+     * @param {{method:string, body:Uint8Array | string, headers:{[key:string]: string}}[]} opts Information list of headers and body.
+     * @returns {Promise<Promise<{url: string,fileName: string, contentLength:number}>[]>} Response list of downloaded files.
+     */
     curl(urlFileNamePairs, opts=[]){
         var req = [];
         var requestNumbers = shortToByteArray(Object.keys(urlFileNamePairs).length);
         req.push(requestNumbers);
         var i=0;
-        for(var [url, fn] of Object.entries(urlFileNamePairs)){
+        for(var [fn, url] of Object.entries(urlFileNamePairs)){
             var opt = opts[i] ?? getDefaultHttpRequest(url);
-            var headers = buildHttpRequest(url, opt);
+            var [headers, body] = buildHttpRequest(url, opt);
 
             var urlLen = shortToByteArray(url.length);
             var fnLen = shortToByteArray(fn.length);
@@ -363,6 +496,7 @@ export class FileSystemClient{
             req.push(this._enc.encode(fn));
             req.push(bodyLen);
             req.push(this._enc.encode(headers));
+            req.push(body);
             i++;
         }
         
@@ -395,6 +529,13 @@ export class FileSystemClient{
             return result;
         });
     }
+
+    /**
+     * Fetch url and get it's headers, body, etc.
+     * @param {string} url 
+     * @param {{method:string, body:Uint8Array | string, headers:{[key:string]: string}}} opt Information of headers and body.
+     * @returns {Promise<{httpVersion:string, statusCode:number, reasonPhrase:string, headers:{[key:string]: string}, body:Uint8Array}>}
+     */
     fetch(url, opt=getDefaultHttpRequest(url)){
         var req = [];
         var headers = buildHttpRequest(url, opt);
@@ -424,6 +565,13 @@ export class FileSystemClient{
             return responseObj;
         });
     }
+
+    /**
+     * Set read-only, last modified time, last access time and create time of file or directory.
+     * @param {string} path 
+     * @param {{readOnly?:boolean, lastModifiedTime?:number, lastAccessTime?:number, createTime?:number}} attr 
+     * @returns {Promise<null>}
+     */
     setAttribute(path, attr={}){
         var readOnly = new Uint8Array(2);
         var toSetTime = new Uint8Array(3);

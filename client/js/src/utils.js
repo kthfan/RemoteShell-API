@@ -1,5 +1,7 @@
 
 
+var encoder = new TextEncoder();
+
 export function fromQueryString(str){
     var result = {};
     var lineList = str.split("&");
@@ -45,7 +47,8 @@ export function buildHttpRequest(url, obj){
     }
 
     var body = obj.body ?? "";
-    return startLine + headers + "\r\n" + body;
+    if(typeof body === "string") body = encoder.encode(body);
+    return [startLine + headers + "\r\n" , body];
 }
 export function parseHttpResponse(arr){
     var len = arr.length;

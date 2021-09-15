@@ -201,7 +201,14 @@ public abstract class VerifyServer extends HttpServer{
 	}
 	
 	private boolean setAllowAccessHost(Request request, Response response) {
-		String origin =  request.getHeaders().get("Origin").split("/")[2];
+		String[] split = request.getHeaders().get("Origin").split("/");
+		String origin;
+		//special case
+		if(split.length == 1 && split[0].compareTo("null") == 0 && this.allowHosts.contains("null")) {
+			response.setDuplicateHeader("Access-Control-Allow-Origin", "null");
+			return true;
+		}
+		else origin = split[2];
 //		// remove port
 //		int portOffset = origin.indexOf(":");
 //		if(portOffset != -1) origin = origin.substring(0, portOffset);
