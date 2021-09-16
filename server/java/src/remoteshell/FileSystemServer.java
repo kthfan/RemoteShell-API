@@ -18,7 +18,6 @@ import java.util.Map;
 import java.util.Set;
 import java.nio.file.Paths;
 
-import test_rsa.FileOperation.FileAttr;
 
 public class FileSystemServer extends VerifyServer{
 	
