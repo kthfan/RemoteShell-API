@@ -1,6 +1,7 @@
 # RemoteShell-API
 Allow browser to access file system and fetch data without considering cors policy. 
-##Usage:
+## Usage:
+### Connect to server:
 ```javascript
 // new instance
 var fileSystemClient = new FileSystemClient();
@@ -14,3 +15,8 @@ fileSystemClient.connect(
   console.error(e);
 });
 ```
+
+### Basic Operation:
+
+##### cwd() : Promise<string>
+Get current working directory.
