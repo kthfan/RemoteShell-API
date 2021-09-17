@@ -127,7 +127,7 @@ client.closeFile(file2); // The same as file2.close()
 ```
 ### Download from url:
 ```javascript
-//Download and save files from url.
+// Download and save files from url.
 client.curl(
   {
     fileName: "index.html", // File name to save downloaded.
@@ -136,7 +136,7 @@ client.curl(
   {
     fileName: "dog.png",
     url: "http://localhost/image.php",
-    opt: { 
+    opt: { // optional
       method: "POST",
       body: '{"request": "dog"}',
       headers: {
@@ -150,6 +150,22 @@ client.curl(
     console.log("URL:", result.url);
     console.log("Content Length:", result.contentLength); // Number of bytes written.
   });
+});
+
+// Fetch url and get it's headers, body, etc.
+client.fetch(
+  "http://localhost",
+  { // optional
+    headers: {
+      Accept: "text/html"
+    }
+  }
+).then(result => {
+  console.log("Http Version:", result.httpVersion);
+  console.log("Status Code:", result.statusCode);
+  console.log("Reason Phrase:", result.reasonPhrase);
+  console.log("Headers:", result.headers);
+  console.log("Body:", body); // Uint8Array
 });
 ```
 
