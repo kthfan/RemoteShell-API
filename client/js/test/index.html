@@ -130,10 +130,14 @@
                     })
                 },
                 curl(...args){
-                    var obj = {};
-                    for(var i=0; i<args.length; i+=2)
-                        obj[args[i]] = args[i+1];
-                    return server.curl(obj)
+                    var arr = [];
+                    for(var i=0; i<args.length; i+=2){
+                        var obj = {};
+                        obj.fileName = args[i];
+                        obj.url = args[i + 1];
+                        arr.push(obj);
+                    }
+                    return server.curl(...arr)
                     .then(async arr => {
                         var result = [];
                         for(var p of arr){
@@ -277,7 +281,7 @@
                         testFile[cmdArr[0]](...cmdArr.slice(1)).then(info => {
                             if(typeof info === "string") pushHistory(info);
                             else if(info instanceof Array) pushHistoryArr(info);
-                            else  pushHistory(info.toString());
+                            else  pushHistory(String(info));
                         }).catch(reason => {
                             if(typeof reason === "string") pushHistory(reason);
                             else if(reason instanceof Array) pushHistoryArr(reason);
@@ -289,7 +293,7 @@
                         console.log(info);
                         if(typeof info === "string") pushHistory(info);
                         else if(info instanceof Array) pushHistoryArr(info);
-                        else  pushHistory(info.toString());
+                        else  pushHistory(String(info));
                     }).catch(reason => {
                         if(typeof reason === "string") pushHistory(reason);
                         else if(reason instanceof Array) pushHistoryArr(reason);

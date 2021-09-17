@@ -258,17 +258,20 @@ export class RemoteFile{
      * While write or transfer data to the server, these operations will be blocked in
      * buffer. After period of time or specific number of operations, buffer will 
      * automatically flush and send these operations to server.
-     * If RemoteFile.flush called, buffer will flush immediately.
+     * If flush, close or read called, buffer will flush immediately.
      * 
      * @returns {Promise<number>} Number of flushed operations.
      */
     flush(){
-        return RemoteFile.flush(this.fileSystemClient );
+        return RemoteFile.flush(this.fileSystemClient);
     }
 
+    /**
+     * Close RemoteFile.
+     * @returns {Promise<null>}
+     */
     close(){
-        this.flush();
-        this.fileSystemClient.closeFile(this);
+        return this.fileSystemClient.closeFile(this);
     }
 }
 
@@ -352,6 +355,7 @@ export class FileSystemClient{
 
     /**
      * Change current working directory.
+     * @param {string} path Directory to change.
      * @returns {Promise<null>}
      */
     chdir(path){
@@ -417,7 +421,7 @@ export class FileSystemClient{
     }
 
     /**
-     * Move file.
+     * Move file or directory.
      * @param {string} from Source path to move.
      * @param {string} to Destination path to move. 
      * @returns {Promise<null>}
@@ -430,7 +434,7 @@ export class FileSystemClient{
     /**
      * Get some attribute of file or directory, for example, is exists, is readable, etc.
      * @param {string} path Path of file.
-     * @param {boolean} verbose If true, returns a verbose result.
+     * @param {boolean} verbose If true, returns a verbose result. Default value is false.
      * @returns {Promise<RemoteFileAttribute>}
      */
     getFileState(path, verbose=false){
@@ -449,7 +453,9 @@ export class FileSystemClient{
      * @param {number} mode Open mode defined in RemoteFile, OPEN_MODE_READ, OPEN_MODE_WRITE, etc.
      * @returns {Promise<RemoteFile>}
      */
-    openFile(path, mode){
+    openFile(path, ...modes){
+        var mode = 0;
+        for(var m of modes) mode |= m;
         var futureId = this._send(FileSystemClient.OPEN_FILE, new Uint8Array([mode]), this._enc.encode(path))
         .then(arr=>this._dec.decode(arr));
         return futureId.then(id => {
@@ -463,6 +469,7 @@ export class FileSystemClient{
      * @returns {Promise<null>}
      */
     closeFile(file){
+        RemoteFile.flush(this);
         return this._send(FileSystemClient.CLOSE_FILE, this._enc.encode(file.id))
         .then(arr=>null);
     }
@@ -473,17 +480,18 @@ export class FileSystemClient{
 
     /**
      * Download and save files from url.
-     * @param { {[key:string]: string}} urlFileNamePairs Key of the object is file name, and value of object is url.
-     * @param {{method:string, body:Uint8Array | string, headers:{[key:string]: string}}[]} opts Information list of headers and body.
+     * @param  {...{fileName:string, url:string, opt?: {method:string, body:Uint8Array | string, headers:{[key:string]: string}}}} downloadOpts 
      * @returns {Promise<Promise<{url: string,fileName: string, contentLength:number}>[]>} Response list of downloaded files.
      */
-    curl(urlFileNamePairs, opts=[]){
+    curl(...downloadOpts){
         var req = [];
-        var requestNumbers = shortToByteArray(Object.keys(urlFileNamePairs).length);
+        var requestNumbers = shortToByteArray(downloadOpts.length);
         req.push(requestNumbers);
-        var i=0;
-        for(var [fn, url] of Object.entries(urlFileNamePairs)){
-            var opt = opts[i] ?? getDefaultHttpRequest(url);
+        // var i=0;
+        console.log(downloadOpts);
+        for(var {fileName, url, opt} of downloadOpts){
+            var fn = fileName;
+            var opt = opt ?? getDefaultHttpRequest(url);
             var [headers, body] = buildHttpRequest(url, opt);
 
             var urlLen = shortToByteArray(url.length);
@@ -497,7 +505,7 @@ export class FileSystemClient{
             req.push(bodyLen);
             req.push(this._enc.encode(headers));
             req.push(body);
-            i++;
+            // i++;
         }
         
         return this.connectContext.request([
