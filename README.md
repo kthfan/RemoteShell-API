@@ -113,5 +113,19 @@ file2.transferFrom( // Write a section of data that read from other file.
   2, // destPosition: Position which data will be write, which in file that is to be write.
   3 // length:       Length of data to be read and write.
 ); // Content of ./file2.txt will be "56aaa"
+
+//Read data
+var data = await file2.read(); // Read entire file, calling read will also invoke flush.
+data = await file1.read(
+  1, // Position where data will be read.
+  4  // Length of data to be read.
+); // data will be Uint8Array of "aaa".
+
+// Close file
+file1.close(); // Invoke flush, too.
+client.closeFile(file2); // The same as file2.close()
 ```
+
+
+
 
