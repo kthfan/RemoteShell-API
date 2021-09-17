@@ -60,17 +60,12 @@ await client.setAttribute(
 ### Read Write
 #### Open Mode:
 | Option | Description |
-| :---: | :---: |
+| :--- | :--- |
 | RemoteFile.OPEN_MODE_READ | Open for read. |
-| :---: | :---: |
 | RemoteFile.OPEN_MODE_WRITE | Open for write. |
-| :---: | :---: |
 | RemoteFile.OPEN_MODE_CREATE | Create file, if the file is already exists, then throw the exception. |
-| :---: | :---: |
 | RemoteFile.OPEN_MODE_CREATE_IF_NOT_EXISTS | Create file if not exists, exception won't throw if the file is already exists. |
-| :---: | :---: |
 | RemoteFile.OPEN_MODE_DELETE_ON_CLOSE | When close the file, the file will be delete. |
-| :---: | :---: |
 | RemoteFile.TRUNCATE_EXISTING | The size of file will be truncated to 0. |
 ```javascript
 var file1 = await client.openFile("./file1.txt");
