@@ -17,36 +17,48 @@ client.connect(
 ```
 
 ### Basic Operation:
+#### Current Directory
 ```javascript
-// Current Directory.
-var cwd = await client.cwd(); // Get current working directory.
-await client.chdir("/home/kthfan/test"); // Change current working directory.
+// Get current working directory.
+var cwd = await client.cwd(); 
 
-// Directory Listing.
-var attrList = await client.listdir("home/kthfan/test/dir1"); // Directory listing.
-attrList = await client.listdir(); // List current directory.
-
-// Create File or Directory.
+// Change current working directory.
+await client.chdir("/home/kthfan/test"); 
+```
+#### Directory Listing
+```javascript
+// Directory listing.
+var attrList = await client.listdir("home/kthfan/test/dir1"); 
+// List current directory.
+attrList = await client.listdir(); 
+```
+#### Create File or Directory
+```javascript
 await client.mkdir("./dir2"); // Create directory.
 await client.createFile("./dir2/temp.txt"); // Create file.
-
-// Move File or Directory.
+```
+#### Move File or Directory
+```javascript
 await client.move(
   "./dir2/temp.txt", // Source path to move.
   "./dir1/temp.txt" // Destination path to move.
 );
-
-// Remove File or Directory.
+```
+#### Remove File or Directory
+```javascript
 await client.remove("./dir2"); // Remove file or directory.
 await client.removeRecursively("./dir1"); // Remove directory recursively.
-
-// Get File Information
-var attr = await client.getFileState( // Get some attribute of file or directory, for example, is exists, is readable, etc.
+```
+#### Get File Information
+```javascript
+// Get some attribute of file or directory, for example, is exists, is readable, etc.
+var attr = await client.getFileState(
   "/home/kthfan/test",
-  true                          // If true, returns a verbose result. Default value is false.
+  true  // If true, returns a verbose result. Default value is false.
 );
-
-// Set Attribute of File or Directory
+```
+#### Set Attribute of File or Directory
+```javascript
 await client.setAttribute(
   "/home/kthfan/test",
   { // The attribute to set.
@@ -73,7 +85,7 @@ buffer. After period of time or specific number of operations, buffer will
 automatically flush and send these operations to server.
 
 If RemoteFile.flush or read called, buffer will flush immediately.
-#### Example:
+#### Open File
 ```javascript
 var file1 = await client.openFile(
   "./file1.txt",
@@ -83,7 +95,9 @@ var file2 = await client.openFile(
   "./file2.txt",
   RemoteFile.OPEN_MODE_CREATE,  RemoteFile.OPEN_MODE_READ, RemoteFile.OPEN_MODE_WRITE // Open Options
 );
-
+```
+#### Write
+```javascript
 var encoder = new TextEncoder(); // Encode text into Uint8Array.
 
 //Write data
@@ -94,12 +108,13 @@ file1.write(
 ); // Content of ./file1.txt will be "1aaa5"
 
 file1.flush(); // Apply changes on server.
-
-//Append data
+```
+#### Append
+```javascript
 file1.append(encoder.encode("67")); // Content of ./file1.txt will be "1aaa567"
-
-//Transfer data between files.
-
+```
+#### Transfer data between files.
+```javascript
 file1.transferTo( // Read a section of data and write it to other file.
   file2,
   4, // srcPosition:  Start position in file that is to be read.
@@ -113,15 +128,17 @@ file2.transferFrom( // Write a section of data that read from other file.
   2, // destPosition: Position which data will be write, which in file that is to be write.
   3 // length:       Length of data to be read and write.
 ); // Content of ./file2.txt will be "56aaa"
-
-//Read data
+```
+#### Read
+```javascript
 var data = await file2.read(); // Read entire file, calling read will also invoke flush.
 data = await file1.read(
   1, // Position where data will be read.
   4  // Length of data to be read.
 ); // data will be Uint8Array of "aaa".
-
-// Close file
+```
+#### Close file
+```javascript
 file1.close(); // Invoke flush, too.
 client.closeFile(file2); // The same as file2.close()
 ```
