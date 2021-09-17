@@ -18,10 +18,22 @@ fileSystemClient.connect(
 
 ### Basic Operation:
 ```javascript
+// Current Directory.
 var cwd = await fileSystemClient.cwd(); // Get current working directory.
 await fileSystemClient.chdir("/home/kthfan/test"); // Change current working directory.
 
-var attrList = fileSystemClient.listdir("home/kthfan/test/dir1"); // Directory listing.
-attrList = fileSystemClient.listdir(); // List current directory.
+// Directory Listing.
+var attrList = await fileSystemClient.listdir("home/kthfan/test/dir1"); // Directory listing.
+attrList = await fileSystemClient.listdir(); // List current directory.
+
+// Create File or Directory.
+await fileSystemClient.mkdir("./dir2"); // Create directory.
+await fileSystemClient.createFile("./dir2/temp.txt"); // Create file.
+
+// Move file or directory.
+await fileSystemClient.move(
+  "./dir2/temp.txt", // Source path to move.
+  "./dir1/temp.txt" // Destination path to move.
+);
 ```
 
