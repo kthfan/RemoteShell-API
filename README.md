@@ -125,7 +125,33 @@ data = await file1.read(
 file1.close(); // Invoke flush, too.
 client.closeFile(file2); // The same as file2.close()
 ```
-
+### Download from url:
+```javascript
+//Download and save files from url.
+client.curl(
+  {
+    fileName: "index.html", // File name to save downloaded.
+    url: "http://localhost" // url to download
+  },
+  {
+    fileName: "dog.png",
+    url: "http://localhost/image.php",
+    opt: { 
+      method: "POST",
+      body: '{"request": "dog"}',
+      headers: {
+        Accept: "image/webp,*/*"
+      }
+    }
+  }
+).then(resultList => {
+  resultList.forEach(result=>{
+    console.log("File name:", result.fileName);
+    console.log("URL:", result.url);
+    console.log("Content Length:", result.contentLength); // Number of bytes written.
+  });
+});
+```
 
 
 
