@@ -109,6 +109,10 @@ file1.write(
   1 // The number of bytes from the beginning of the file which data will be write. If not specified, then position will be zero.
 ); // Content of ./file1.txt will be "1aaa5"
 ```
+| File Name | Content |
+| :--- | :--- |
+| file1.txt | 1aaa5 |
+| file2.txt |  |
 ### Flush
 While write or transfer data to the server, these operations will be blocked in
 buffer. After period of time or specific number of operations, buffer will 
@@ -118,10 +122,6 @@ If flush, read or close called, buffer will flush immediately.
 ```javascript
 file1.flush(); // Apply changes on server.
 ```
-| File Name | Content |
-| :--- | :--- |
-| file1.txt | 1aaa5 |
-| file2.txt |  |
 #### Append
 ```javascript
 file1.append(encoder.encode("67")); // Content of ./file1.txt will be "1aaa567"
@@ -169,8 +169,8 @@ file1.close(); // Invoke flush, too.
 client.closeFile(file2); // The same as file2.close()
 ```
 ### Download from url:
+#### Download from url and save to files .
 ```javascript
-// Download and save files from url.
 client.curl(
   {
     fileName: "index.html", // File name to save downloaded.
@@ -194,7 +194,9 @@ client.curl(
     console.log("Content Length:", result.contentLength); // Number of bytes written.
   });
 });
-
+```
+#### Download from url and send to browser.
+```javascript
 // Fetch url and get it's headers, body, etc.
 client.fetch(
   "http://localhost",
