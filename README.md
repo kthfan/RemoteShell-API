@@ -79,12 +79,7 @@ await client.setAttribute(
 | RemoteFile.OPEN_MODE_CREATE_IF_NOT_EXISTS | Create file if not exists, exception won't throw if the file is already exists. |
 | RemoteFile.OPEN_MODE_DELETE_ON_CLOSE | When close the file, the file will be delete. |
 | RemoteFile.TRUNCATE_EXISTING | The size of file will be truncated to 0. |
-#### Flush
-While write or transfer data to the server, these operations will be blocked in
-buffer. After period of time or specific number of operations, buffer will 
-automatically flush and send these operations to server.
 
-If RemoteFile.flush or read called, buffer will flush immediately.
 #### Open File
 ```javascript
 var file1 = await client.openFile(
@@ -96,23 +91,45 @@ var file2 = await client.openFile(
   RemoteFile.OPEN_MODE_CREATE,  RemoteFile.OPEN_MODE_READ, RemoteFile.OPEN_MODE_WRITE // Open Options
 );
 ```
+Take file1.txt and file2.txt as examples to illustrate the effect of the following file operations. 
 #### Write
 ```javascript
 var encoder = new TextEncoder(); // Encode text into Uint8Array.
 
 //Write data
 file1.write(encoder.encode("12345")); // Content of ./file1.txt will be "12345"
+```
+| File Name | Content |
+| :--- | :--- |
+| file1.txt | 12345 |
+| file2.txt |  |
+```javascript
 file1.write(
   encoder.encode("aaa"),
   1 // The number of bytes from the beginning of the file which data will be write. If not specified, then position will be zero.
 ); // Content of ./file1.txt will be "1aaa5"
+```
+### Flush
+While write or transfer data to the server, these operations will be blocked in
+buffer. After period of time or specific number of operations, buffer will 
+automatically flush and send these operations to server.
 
+If flush, read or close called, buffer will flush immediately.
+```javascript
 file1.flush(); // Apply changes on server.
 ```
+| File Name | Content |
+| :--- | :--- |
+| file1.txt | 1aaa5 |
+| file2.txt |  |
 #### Append
 ```javascript
 file1.append(encoder.encode("67")); // Content of ./file1.txt will be "1aaa567"
 ```
+| File Name | Content |
+| :--- | :--- |
+| file1.txt | 1aaa567 |
+| file2.txt |  |
 #### Transfer data between files.
 ```javascript
 file1.transferTo( // Read a section of data and write it to other file.
@@ -121,7 +138,12 @@ file1.transferTo( // Read a section of data and write it to other file.
   0, // destPosition: Position which data will be write, which in file that is to be write.
   3  // length:       Length of data to be read and write.
 ); // Content of ./file2.txt will be "567"
-
+```
+| File Name | Content |
+| :--- | :--- |
+| file1.txt | 1aaa567 |
+| file2.txt | 567 |
+```javascript
 file2.transferFrom( // Write a section of data that read from other file.
   file1,
   1, // srcPosition:  Start position in file that is to be read.
@@ -129,6 +151,10 @@ file2.transferFrom( // Write a section of data that read from other file.
   3 // length:       Length of data to be read and write.
 ); // Content of ./file2.txt will be "56aaa"
 ```
+| File Name | Content |
+| :--- | :--- |
+| file1.txt | 1aaa567 |
+| file2.txt | 56aaa |
 #### Read
 ```javascript
 var data = await file2.read(); // Read entire file, calling read will also invoke flush.
