@@ -40,9 +40,21 @@ await client.move(
 await client.remove("./dir2"); // Remove file or directory.
 await client.removeRecursively("./dir1"); // Remove directory recursively.
 
-//Get File Information
-var attr = client.getFileState(
+// Get File Information
+var attr = client.getFileState( // Get some attribute of file or directory, for example, is exists, is readable, etc.
+  "/home/kthfan/test",
+  true                          // If true, returns a verbose result. Default value is false.
+);
 
+// Set Attribute of File or Directory
+client.setAttribute(
+  "/home/kthfan/test",
+  { // The attribute to set.
+    readOnly: false,
+    lastModifiedTime:　1631847618509,
+    lastAccessTime: 1631847618509,
+    createTime: 1631847618509
+  }
 );
 ```
 
