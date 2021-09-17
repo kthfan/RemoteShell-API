@@ -84,6 +84,34 @@ var file2 = await client.openFile(
   RemoteFile.OPEN_MODE_CREATE,  RemoteFile.OPEN_MODE_READ, RemoteFile.OPEN_MODE_WRITE // Open Options
 );
 
-file1.write();
+var encoder = new TextEncoder(); // Encode text into Uint8Array.
+
+//Write data
+file1.write(encoder.encode("12345")); // Content of ./file1.txt will be "12345"
+file1.write(
+  encoder.encode("aaa"),
+  1 // The number of bytes from the beginning of the file which data will be write. If not specified, then position will be zero.
+); // Content of ./file1.txt will be "1aaa5"
+
+file1.flush(); // Apply changes on server.
+
+//Append data
+file1.append(encoder.encode("67")); // Content of ./file1.txt will be "1aaa567"
+
+//Transfer data between files.
+
+file1.transferTo( // Read a section of data and write it to other file.
+  file2,
+  4, // srcPosition:  Start position in file that is to be read.
+  0, // destPosition: Position which data will be write, which in file that is to be write.
+  3  // length:       Length of data to be read and write.
+); // Content of ./file2.txt will be "567"
+
+file2.transferFrom( // Write a section of data that read from other file.
+  file1,
+  1, // srcPosition:  Start position in file that is to be read.
+  2, // destPosition: Position which data will be write, which in file that is to be write.
+  3 // length:       Length of data to be read and write.
+); // Content of ./file2.txt will be "56aaa"
 ```
 
