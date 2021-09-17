@@ -67,8 +67,23 @@ await client.setAttribute(
 | RemoteFile.OPEN_MODE_CREATE_IF_NOT_EXISTS | Create file if not exists, exception won't throw if the file is already exists. |
 | RemoteFile.OPEN_MODE_DELETE_ON_CLOSE | When close the file, the file will be delete. |
 | RemoteFile.TRUNCATE_EXISTING | The size of file will be truncated to 0. |
-```javascript
-var file1 = await client.openFile("./file1.txt");
+#### Flush
+While write or transfer data to the server, these operations will be blocked in
+buffer. After period of time or specific number of operations, buffer will 
+automatically flush and send these operations to server.
 
+If RemoteFile.flush or read called, buffer will flush immediately.
+#### Example:
+```javascript
+var file1 = await client.openFile(
+  "./file1.txt",
+  RemoteFile.OPEN_MODE_CREATE,  RemoteFile.OPEN_MODE_READ, RemoteFile.OPEN_MODE_WRITE // Open Options
+);
+var file2 = await client.openFile(
+  "./file2.txt",
+  RemoteFile.OPEN_MODE_CREATE,  RemoteFile.OPEN_MODE_READ, RemoteFile.OPEN_MODE_WRITE // Open Options
+);
+
+file1.write();
 ```
 
