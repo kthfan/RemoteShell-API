@@ -17,6 +17,11 @@ fileSystemClient.connect(
 ```
 
 ### Basic Operation:
+```javascript
+var cwd = await fileSystemClient.cwd(); // Get current working directory.
+await fileSystemClient.chdir("/home/kthfan/test"); // Change current working directory.
 
-##### cwd() : Promise<string>
-Get current working directory.
+var attrList = fileSystemClient.listdir("home/kthfan/test/dir1"); // Directory listing.
+attrList = fileSystemClient.listdir(); // List current directory.
+```
+
