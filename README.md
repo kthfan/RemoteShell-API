@@ -41,13 +41,13 @@ await client.remove("./dir2"); // Remove file or directory.
 await client.removeRecursively("./dir1"); // Remove directory recursively.
 
 // Get File Information
-var attr = client.getFileState( // Get some attribute of file or directory, for example, is exists, is readable, etc.
+var attr = await client.getFileState( // Get some attribute of file or directory, for example, is exists, is readable, etc.
   "/home/kthfan/test",
   true                          // If true, returns a verbose result. Default value is false.
 );
 
 // Set Attribute of File or Directory
-client.setAttribute(
+await client.setAttribute(
   "/home/kthfan/test",
   { // The attribute to set.
     readOnly: false,
@@ -56,5 +56,24 @@ client.setAttribute(
     createTime: 1631847618509
   }
 );
+```
+### Read Write
+#### Open Mode:
+| Option | Description |
+| :---: | :---: |
+| RemoteFile.OPEN_MODE_READ | Open for read. |
+| :---: | :---: |
+| RemoteFile.OPEN_MODE_WRITE | Open for write. |
+| :---: | :---: |
+| RemoteFile.OPEN_MODE_CREATE | Create file, if the file is already exists, then throw the exception. |
+| :---: | :---: |
+| RemoteFile.OPEN_MODE_CREATE_IF_NOT_EXISTS | Create file if not exists, exception won't throw if the file is already exists. |
+| :---: | :---: |
+| RemoteFile.OPEN_MODE_DELETE_ON_CLOSE | When close the file, the file will be delete. |
+| :---: | :---: |
+| RemoteFile.TRUNCATE_EXISTING | The size of file will be truncated to 0. |
+```javascript
+var file1 = await client.openFile("./file1.txt");
+
 ```
 
