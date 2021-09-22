@@ -433,7 +433,7 @@ export class RSA{
             k++;
         }
     
-        if (k <= 0n) {
+        if (k <= 0) {
             return false;
         }
         const r = n1 >> BigInt(k);

@@ -91,15 +91,11 @@ public class FileSystemServer extends VerifyServer{
 	}
 	
 	FileSystemServer(){
-		super();
-		this.fileOperation = new FileOperation(Arrays.asList(System.getProperty("user.dir")));
-		FileOperation.FileResult fileResult = fileOperation.chdir(System.getProperty("user.dir"));
-		if(fileResult.errorCode != 0)
-			throw new AccessControlException(fileResult.message);
-		
+		this(null, null, null, null);
 	}
 	FileSystemServer(String workingDir, String token, Collection<String> allowHosts, Collection<Integer> ports){
 		super(token, allowHosts, ports);
+		if(workingDir == null) workingDir = System.getProperty("user.dir");
 		this.fileOperation = new FileOperation(Arrays.asList(workingDir));
 		FileOperation.FileResult fileResult = fileOperation.chdir(workingDir);
 		if(fileResult.errorCode != 0)

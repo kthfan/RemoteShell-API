@@ -54,10 +54,10 @@ public class Main {
 //		console.log(bb.array());
 		
 //		
-		FileSystemServer server = new FileSystemServer("D:\\kthfa\\test", null, Arrays.asList("127.0.0.1", "followjohn.epizy.com"), Arrays.asList(1234, 8080));
-
-		console.log(server.getToken());
-		server.start();
+//		FileSystemServer server = new FileSystemServer("D:\\kthfa\\test", null, Arrays.asList("127.0.0.1", "followjohn.epizy.com"), Arrays.asList(1234, 8080));
+//
+//		console.log(server.getToken());
+//		server.start();
 		
 //		VerifyServer server = new VerifyServer(null, new HashSet<String>(Arrays.asList("127.0.0.1")), new HashSet<Integer>(Arrays.asList(1234, 8080))) {
 //			@Override
@@ -79,10 +79,10 @@ public class Main {
 //		console.log(key);
 //		AesCtr aesEnc = new AesCtr(key);
 //		AesCtr aesDec = new AesCtr(key);
-		new HttpServer(new HashSet<Integer>(Arrays.asList(1234, 8080))) {
-			public void onRequest(Request request, Response response, Socket socket) {
-				response.setDuplicateHeader("Access-Control-Allow-Origin", "http://127.0.0.1");
-				response.setHeader("Content-Type", "text/html; charset=UTF-8");
+//		new HttpServer(new HashSet<Integer>(Arrays.asList(1234, 8080))) {
+//			public void onRequest(Request request, Response response, Socket socket) {
+//				response.setDuplicateHeader("Access-Control-Allow-Origin", "http://127.0.0.1");
+//				response.setHeader("Content-Type", "text/html; charset=UTF-8");
 				
 //				console.log(aesDec.decrypt(request.getBody()));
 //				byte[] data = new byte[2048];
@@ -114,8 +114,8 @@ public class Main {
 //				response.sendHeader();
 //				response.sendBody();
 //				response.getWriter().send("append data".getBytes());
-			}
-		}.start();
+//			}
+//		}.start();
 		
 //		new EchoSocket().start();
 //		InetAddress host = InetAddress.getByName(null);
@@ -255,84 +255,84 @@ public class Main {
         return flag;  
     }  
 }
-class EchoSocket{
-	public void start() throws IOException {
-		InetAddress host = InetAddress.getByName(null);
-		Selector selector = Selector.open();
-		List<ServerSocketChannel> serverSocketChannelList = new ArrayList<ServerSocketChannel>();
-		
-		ServerSocketChannel serverSocketChannel = ServerSocketChannel.open();
-		serverSocketChannel.configureBlocking(false);
-		serverSocketChannel.bind(new InetSocketAddress(host, 1234));
-		serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT);
-		serverSocketChannelList.add(serverSocketChannel);
-		
-		SelectionKey key = null;
-		while (true) {
-			if (selector.select() <= 0)
-				continue;
-			Set<SelectionKey> selectedKeys = selector.selectedKeys();
-			Iterator<SelectionKey> iterator = selectedKeys.iterator();
-			while (iterator.hasNext()) {
-				key = (SelectionKey) iterator.next();
-	            iterator.remove();
-	            if (key.isAcceptable()) {
-	               SocketChannel sc = ((ServerSocketChannel) key.channel()).accept();
-	               sc.configureBlocking(false);
-	               sc.register(selector, SelectionKey.OP_READ);
-	               System.out.println("Connection Accepted: " + sc.getLocalAddress() + "n");
-	            }
-	            if (key.isReadable()) {
-	               SocketChannel sc = (SocketChannel) key.channel();
-	            
-	               if(!sc.isOpen() || !sc.isConnected()) {
-	            	   sc.close();
-	            	   continue;
-	               }
-	               try {
-	            	   ByteBuffer bb = ByteBuffer.allocate(1024);
-	            	   System.out.println("Read data: ");
-//	            	   ByteIterator byteIter = new ByteIterator(sc);
-//	            	   sc.read(bb);
-	            	   
-	            	   HttpServer.Request r = new HttpServer.Request();
-	            	   r.parseRequest(sc);
-	            	   if(r.getMethod() == null) sc.close();
-	            	   
-	            	   if(sc.isOpen() && sc.isConnected()) {
-	   					
-//	            		   String result =  new String(r.getReader().getRemainingBytes());
-		            	   
-//		            	   byteIter.getRemainingBytes();
-		            	   System.out.println(r.getBodyText());
-			               
-		            	   bb.flip();
-		            	   System.out.println("Write data.");
-		            	   String echoData = "HTTP/1.1 200 OK\r\n"
-			            	   		+ "content-type: text/html; charset=UTF-8\r\n\r\n"
-			            	   		+ "my data";
-		            	   
-		            	   sc.write(ByteBuffer.wrap(echoData.getBytes()));
-		   				}
-	            	   
-	            	   sc.close();
-//		               if (result.length() == 0) {
-//		                  sc.close();
-//		                  System.out.println("Connection closed...");
-//		                  System.out.println(
-//		                     "Server will keep running. " +
-//		                     "Try running another client to " +
-//		                     "re-establish connection");
-//		               }
-	               }catch(IOException e) {
-	            	   System.out.println(e.getMessage() + ": read fail.");
-	            	   sc.close();
-	               }
-//	               sc.register(selector, SelectionKey.OP_WRITE);
-	            }
-			}
-		}
-	}
-}
+//class EchoSocket{
+//	public void start() throws IOException {
+//		InetAddress host = InetAddress.getByName(null);
+//		Selector selector = Selector.open();
+//		List<ServerSocketChannel> serverSocketChannelList = new ArrayList<ServerSocketChannel>();
+//		
+//		ServerSocketChannel serverSocketChannel = ServerSocketChannel.open();
+//		serverSocketChannel.configureBlocking(false);
+//		serverSocketChannel.bind(new InetSocketAddress(host, 1234));
+//		serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT);
+//		serverSocketChannelList.add(serverSocketChannel);
+//		
+//		SelectionKey key = null;
+//		while (true) {
+//			if (selector.select() <= 0)
+//				continue;
+//			Set<SelectionKey> selectedKeys = selector.selectedKeys();
+//			Iterator<SelectionKey> iterator = selectedKeys.iterator();
+//			while (iterator.hasNext()) {
+//				key = (SelectionKey) iterator.next();
+//	            iterator.remove();
+//	            if (key.isAcceptable()) {
+//	               SocketChannel sc = ((ServerSocketChannel) key.channel()).accept();
+//	               sc.configureBlocking(false);
+//	               sc.register(selector, SelectionKey.OP_READ);
+//	               System.out.println("Connection Accepted: " + sc.getLocalAddress() + "n");
+//	            }
+//	            if (key.isReadable()) {
+//	               SocketChannel sc = (SocketChannel) key.channel();
+//	            
+//	               if(!sc.isOpen() || !sc.isConnected()) {
+//	            	   sc.close();
+//	            	   continue;
+//	               }
+//	               try {
+//	            	   ByteBuffer bb = ByteBuffer.allocate(1024);
+//	            	   System.out.println("Read data: ");
+////	            	   ByteIterator byteIter = new ByteIterator(sc);
+////	            	   sc.read(bb);
+//	            	   
+//	            	   HttpServer.Request r = new HttpServer.Request();
+//	            	   r.parseRequest(sc);
+//	            	   if(r.getMethod() == null) sc.close();
+//	            	   
+//	            	   if(sc.isOpen() && sc.isConnected()) {
+//	   					
+////	            		   String result =  new String(r.getReader().getRemainingBytes());
+//		            	   
+////		            	   byteIter.getRemainingBytes();
+//		            	   System.out.println(r.getBodyText());
+//			               
+//		            	   bb.flip();
+//		            	   System.out.println("Write data.");
+//		            	   String echoData = "HTTP/1.1 200 OK\r\n"
+//			            	   		+ "content-type: text/html; charset=UTF-8\r\n\r\n"
+//			            	   		+ "my data";
+//		            	   
+//		            	   sc.write(ByteBuffer.wrap(echoData.getBytes()));
+//		   				}
+//	            	   
+//	            	   sc.close();
+////		               if (result.length() == 0) {
+////		                  sc.close();
+////		                  System.out.println("Connection closed...");
+////		                  System.out.println(
+////		                     "Server will keep running. " +
+////		                     "Try running another client to " +
+////		                     "re-establish connection");
+////		               }
+//	               }catch(IOException e) {
+//	            	   System.out.println(e.getMessage() + ": read fail.");
+//	            	   sc.close();
+//	               }
+////	               sc.register(selector, SelectionKey.OP_WRITE);
+//	            }
+//			}
+//		}
+//	}
+//}
 
 

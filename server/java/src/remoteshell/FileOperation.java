@@ -52,7 +52,7 @@ public class FileOperation {
 			this.attrs[0] = exists ? "1" : "0";
 		}
 		public void setFileName(String name) {
-			this.attrs[1] = "\"" + String.valueOf(name) + "\"";
+			this.attrs[1] = "\"" + name + "\"";
 		}
 		public void setFileType(char fileType) {
 			this.attrs[2] = "\"" + String.valueOf(fileType) + "\"";

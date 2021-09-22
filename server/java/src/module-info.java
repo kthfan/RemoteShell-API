@@ -1,0 +1,3 @@
+module RemoteShell {
+	exports remoteshell;
+}

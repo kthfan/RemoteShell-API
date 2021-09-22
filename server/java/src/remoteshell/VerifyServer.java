@@ -204,7 +204,8 @@ public abstract class VerifyServer extends HttpServer{
 		String[] split = request.getHeaders().get("Origin").split("/");
 		String origin;
 		//special case
-		if(split.length == 1 && split[0].compareTo("null") == 0 && this.allowHosts.contains("null")) {
+		if(split.length == 1 && split[0].compareTo("null") == 0) {
+			if (!this.allowHosts.contains("null")) return false;
 			response.setDuplicateHeader("Access-Control-Allow-Origin", "null");
 			return true;
 		}
