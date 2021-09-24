@@ -2,10 +2,14 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Security.AccessControl;
 using System.Security.Principal;
 using System.Text;
 using System.Threading.Tasks;
+using System.Net.Http.Headers;
+using System.Net;
+using System.Threading;
 
 namespace RemoteShelll
 {
@@ -149,7 +153,7 @@ namespace RemoteShelll
 			result = new byte[2 + messageLen + 8 + dataLen];
 
 			result[0] = this.errorCode; // set error code
-			result[1] = (byte)this.message.Length; // set message length
+			result[1] = (byte)this.message.Length; // set message length // fatal error: may cause memory leak
 			Array.Copy(Encoding.UTF8.GetBytes(this.message), 0, result, 2, messageLen); // set message
 
 			Array.Copy(FileSystemServer.getBytesFromLong(dataLen), 0, result, 2 + messageLen, 8); // set data length
@@ -164,8 +168,12 @@ namespace RemoteShelll
 		public readonly static String RESULT_FAIL = "Fail.";
 		public readonly static String RESULT_NOT_EXISTS = "File not exists.";
 		public readonly static String RESULT_PERMISSION_DENIED = "Permission denied.";
-		private String _cwd;
+
+		internal DateTime StartDateTime = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
 		private ISet<String> AllowedPath = new HashSet<String>();
+
+		//private List<HttpWebRequest> _requestList = new List<HttpWebRequest>();
 
 		//private ExecutorService executorService = Executors.newCachedThreadPool();
 		//ReentrantLock curlLock = new ReentrantLock();
@@ -242,16 +250,6 @@ namespace RemoteShelll
             {
 				return new FileResult(1, e.ToString());
 			}
-			
-
-			//FileAttributes attr = File.GetAttributes(@path);
-			
-			//if (!this.IsPathAllow(path)) return new FileResult(1, RESULT_PERMISSION_DENIED);
-			//if (!attr.HasFlag(FileAttributes.Directory)) return new FileResult(1, "Not a directory.");
-
-			//this._cwd = path;
-			////this._cwd = this._cwd.replaceAll("\\\\", "/");
-			//if (!this._cwd.EndsWith("\\")) this._cwd += "\\";
 			return new FileResult(0, RESULT_OK);
 		}
 
@@ -396,9 +394,11 @@ namespace RemoteShelll
 					attrs.setOwner(Directory.GetAccessControl(path).GetOwner(typeof(NTAccount)).ToString());
 					attrs.setHidden(attr.HasFlag(FileAttributes.Hidden));
 
-					attrs.setCreationTime(Directory.GetCreationTime(path).Millisecond);
-					attrs.setLastAccessTime(Directory.GetLastAccessTime(path).Millisecond);
-					attrs.setLastModifiedTime(Directory.GetLastWriteTime(path).Millisecond);
+					
+						
+					attrs.setCreationTime((long) (Directory.GetCreationTimeUtc(path) - StartDateTime).TotalMilliseconds);
+					attrs.setLastAccessTime((long)(Directory.GetLastAccessTimeUtc(path) - StartDateTime).TotalMilliseconds);
+					attrs.setLastModifiedTime((long)(Directory.GetLastWriteTimeUtc(path) - StartDateTime).TotalMilliseconds);
 				}
                 else
                 {
@@ -410,9 +410,9 @@ namespace RemoteShelll
 					attrs.setOwner(File.GetAccessControl(path).GetOwner(typeof(NTAccount)).ToString());
 					attrs.setHidden(attr.HasFlag(FileAttributes.Hidden));
 
-					attrs.setCreationTime(File.GetCreationTime(path).Millisecond);
-					attrs.setLastAccessTime(File.GetLastAccessTime(path).Millisecond);
-					attrs.setLastModifiedTime(File.GetLastWriteTime(path).Millisecond);
+					attrs.setCreationTime((long)(File.GetCreationTimeUtc(path) - StartDateTime).TotalMilliseconds);
+					attrs.setLastAccessTime((long)(File.GetLastAccessTimeUtc(path) - StartDateTime).TotalMilliseconds);
+					attrs.setLastModifiedTime((long)(File.GetLastWriteTimeUtc(path) - StartDateTime).TotalMilliseconds);
 				}
 				
 			} catch (SystemException e) {
@@ -550,7 +550,6 @@ namespace RemoteShelll
 					if(!File.Exists(path))
                     {
 						fs = File.Create(path, 4096, FileOptions.DeleteOnClose);
-
 					}
                 }
 				if ((mode & FileSystemServer.OPEN_MODE_TRUNCATE_EXISTING) != 0) fileMode = FileMode.Truncate;
@@ -569,7 +568,7 @@ namespace RemoteShelll
 			return new FileResult(0, RESULT_OK);
 		}
 
-		internal static long CopyStream(Stream src, Stream dest, long srcOffset, long destOffset, int count)
+		internal static long CopyStream(Stream src, Stream dest, long srcOffset, long destOffset, long count)
 		{
 			byte[] buffer = new byte[32768];
 			long total = 0;
@@ -577,7 +576,7 @@ namespace RemoteShelll
 			if (srcOffset != 0) src.Position += srcOffset;
 			if (destOffset != 0) dest.Position += destOffset;
 			while (count > 0 &&
-				   (read = src.Read(buffer, 0, Math.Min(buffer.Length, count))) > 0)
+				   (read = src.Read(buffer, 0, (int)Math.Min(buffer.Length, count))) > 0)
 			{
 				total += read;
 				dest.Write(buffer, 0, read);
@@ -590,7 +589,7 @@ namespace RemoteShelll
 		{
 			try
 			{
-				
+				fc.Position = 0;
 				fc.CopyTo(writer);
 				byte[] result = new FileResult(0, RESULT_OK, fc.Length).getBytes();
 				writer.Write(result, 0, result.Length);
@@ -605,7 +604,8 @@ namespace RemoteShelll
 		{
 			try
 			{
-				long readLen = FileOperation.CopyStream(fc, writer, position, 0, (int)length);
+				fc.Position = position;
+				long readLen = FileOperation.CopyStream(fc, writer, 0, 0, (int)length);
 				byte[] result = new FileResult(0, RESULT_OK, readLen).getBytes();
 				writer.Write(result, 0, result.Length);
 			}
@@ -619,7 +619,7 @@ namespace RemoteShelll
 		{
 			try
 			{
-				
+				fc.Position = 0;
 				long writtenLen = FileOperation.CopyStream(reader, fc, 0, 0, (int)length);
 				byte[] result = new FileResult(0, RESULT_OK, writtenLen).getBytes();
 				writer.Write(result, 0, result.Length);
@@ -634,6 +634,7 @@ namespace RemoteShelll
 		{
 			try
 			{
+				fc.Position = position;
 				long writtenLen = FileOperation.CopyStream(reader, fc, 0, position, (int)length);
 				byte[] result = new FileResult(0, RESULT_OK, writtenLen).getBytes();
 				writer.Write(result, 0, result.Length);
@@ -648,7 +649,9 @@ namespace RemoteShelll
 		{
 			try
 			{
-				long transferredLen = FileOperation.CopyStream(srcFc, destFc, srcPosition, destPosition, (int)length);
+				srcFc.Position = srcPosition;
+				destFc.Position = destPosition;
+				long transferredLen = FileOperation.CopyStream(srcFc, destFc, 0, 0, (int)length);
 				byte[] result = new FileResult(0, RESULT_OK, transferredLen).getBytes();
 				writer.Write(result, 0, result.Length);
 			}
@@ -663,7 +666,8 @@ namespace RemoteShelll
 
 			try
 			{
-				long writtenLen = FileOperation.CopyStream(reader, fc, 0, fc.Length, (int)length);
+				fc.Position = fc.Length;
+				long writtenLen = FileOperation.CopyStream(reader, fc, 0, 0, (int)length);
 				byte[] result = new FileResult(0, RESULT_OK, writtenLen).getBytes();
 				writer.Write(result, 0, result.Length);
 			}
@@ -671,6 +675,263 @@ namespace RemoteShelll
 			{
 				byte[] result = new FileResult(1, e.ToString(), 0L).getBytes();
 				writer.Write(result, 0, result.Length);
+			}
+		}
+
+		public void curl(Stream reader, Stream writer, HttpListenerRequest request, HttpListenerResponse response)
+        {
+            byte[] bufferShort = new byte[2];
+            byte[] bufferLong = new byte[8];
+            byte[] buffer;
+            reader.Read(bufferShort, 0, 2);
+            short requestNumbers = FileSystemServer.getShortFromBytes(bufferShort);
+            List<Task<WebResponse>> taskList = new List<Task<WebResponse>>();
+            List<String> urlList = new List<String>();
+            List<String> fnList = new List<String>();
+			List<String> originalFnList = new List<String>();
+			for (short i = 0; i < requestNumbers; i++)
+            {
+                reader.Read(bufferShort, 0, 2);
+                short urlLen = FileSystemServer.getShortFromBytes(bufferShort);
+                buffer = new byte[urlLen];
+                reader.Read(buffer, 0, urlLen);
+                String url = Encoding.UTF8.GetString(buffer);
+                reader.Read(bufferShort, 0, 2);
+                short fnLen = FileSystemServer.getShortFromBytes(bufferShort);
+                buffer = new byte[fnLen];
+                reader.Read(buffer, 0, fnLen);
+                String fn = Encoding.UTF8.GetString(buffer);
+                reader.Read(bufferLong, 0, 8);
+                long bodyLen = FileSystemServer.getLongFromBytes(bufferLong);
+
+
+                Task<WebResponse> task = this._curl(url, fn, reader, writer, bodyLen);
+                if (task != null)
+                {
+                    urlList.Add(url);
+                    fnList.Add(Path.GetFullPath(fn));
+					originalFnList.Add(fn);
+					taskList.Add(task);
+                }
+            }
+
+            try
+            {
+                Task.WaitAll(taskList.ToArray());
+                for (int i = 0; i < taskList.Count; i++)
+                {
+                    this._EndCurl((HttpWebResponse)taskList[i].Result, urlList[i], fnList[i], writer, originalFnList[i]);
+                }
+            }
+            catch (AggregateException e)
+            {
+                Console.WriteLine("The following exceptions have been thrown by WaitAll(): (THIS WAS EXPECTED)");
+                for (int j = 0; j < e.InnerExceptions.Count; j++)
+                {
+                    Console.WriteLine("\n-------------------------------------------------\n{0}", e.InnerExceptions[j].ToString());
+                }
+            }
+            //this.SendCurlResult(writer, 0, RESULT_OK, urlList[0], fnList[0], 0L);
+			request.InputStream.Close();
+			response.OutputStream.Close();
+
+		}
+		private List<String[]> ReadHeaderField(Stream stream)
+        {
+			int bufferCursor = 0;
+			byte[] buffer = new byte[2048];
+			int lastByte = stream.ReadByte(), currentByte = stream.ReadByte();
+			buffer[0] = (byte) lastByte;
+			buffer[1] = (byte) currentByte;
+			bufferCursor = 2;
+			List<String> lineList = new List<String>();
+			int lastCRLFIndex = 0;
+			int i = 1;
+
+			do
+			{
+				if (currentByte == 10 && lastByte == 13)
+				{ // if requestData[i-1:i+1] = "\r\n"
+					if (i - 1 == lastCRLFIndex)
+					{ // if duplicate \r\n occur, then split headers and body
+						lastCRLFIndex = i + 1;
+						// body is lastCRLFIndex to requestData.length
+						break;
+					}
+					lineList.Add(Encoding.UTF8.GetString(buffer, 0, bufferCursor - 2));
+					bufferCursor = 0;
+					lastCRLFIndex = i + 1;
+				}
+				lastByte = currentByte;
+				currentByte = stream.ReadByte();
+				buffer[bufferCursor] = (byte) currentByte;
+				bufferCursor++;
+				i++;
+			} while (currentByte != -1);
+			List<String[]> result = new List<String[]>();
+			result.Add(lineList[0].Split(' '));
+			for(int j=1; j< lineList.Count; j++)
+            {
+				String[] split = lineList[j].Split(':');
+				if(split.Length > 2)
+                {
+					for(int k=2; k<split.Length; k++)
+                    {
+						split[1] += ":" + split[k];
+					}
+                }
+				if (split.Length > 0) split[0] = split[0].Trim();
+				if (split.Length > 1) split[1] = split[1].Trim();
+				result.Add(split);
+			}
+			return result;
+		}
+		private void setHeaders(List<String[]> headers, HttpWebRequest httpRequest)
+        {
+			httpRequest.Method = headers[0][0];
+			for (int i = 1; i < headers.Count; i++)
+			{
+				if (string.Equals(headers[i][0], "Host", StringComparison.OrdinalIgnoreCase))
+				{
+					httpRequest.Host = headers[i][1];
+
+				}
+				else if (string.Equals(headers[i][0], "Referer", StringComparison.OrdinalIgnoreCase))
+				{
+					httpRequest.Referer = headers[i][1];
+				}
+				else if (string.Equals(headers[i][0], "Accept", StringComparison.OrdinalIgnoreCase))
+				{
+					httpRequest.Accept = headers[i][1];
+				}
+				else if (string.Equals(headers[i][0], "User-Agent", StringComparison.OrdinalIgnoreCase))
+				{
+					httpRequest.UserAgent = headers[i][1];
+				}
+				else httpRequest.Headers.Add(headers[i][0], headers[i][1]);
+			}
+		}
+		private Task<WebResponse> _curl(String url, String fn, Stream reader, Stream writer, long bodyLen)
+        {
+            try
+            {
+				HttpWebRequest httpRequest = (HttpWebRequest)WebRequest.Create(url);
+
+				httpRequest.AutomaticDecompression = DecompressionMethods.GZip;
+				httpRequest.ClientCertificates.Add(new System.Security.Cryptography.X509Certificates.X509Certificate());
+
+				this.setHeaders(this.ReadHeaderField(reader), httpRequest);
+
+
+				if (bodyLen != 0) reader.CopyTo(httpRequest.GetRequestStream());
+
+				//this._EndCurl((HttpWebResponse)httpRequest.GetResponse(), url, fn, writer);
+				return httpRequest.GetResponseAsync();
+			}
+            catch (SystemException e)
+            {
+				this.SendCurlResult(writer, 1, e.ToString(), url, fn, 0L);
+				return null;
+            }
+			return null;
+		}
+		private void SendCurlResult(Stream writer, int errCode, String msg, String url, String fn, long contentLength)
+		{
+			lock(writer){
+				byte[] buffer = new FileResult(errCode, msg, url).getBytes();
+				writer.Write(buffer, 0, buffer.Length);
+				buffer = Encoding.UTF8.GetBytes(fn);
+				writer.Write(FileSystemServer.getBytesFromShort((short)buffer.Length), 0, 2);
+				writer.Write(buffer, 0, buffer.Length);
+				writer.Write(FileSystemServer.getBytesFromLong(contentLength), 0, 8);
+			}
+		}
+		private void _EndCurl(HttpWebResponse httpResponse, String url, String fn, Stream writer, String originalFn)
+        {
+            try
+            {
+                using (FileStream fs = File.Open(fn, FileMode.CreateNew))
+                {
+                    httpResponse.GetResponseStream().CopyTo(fs);
+                    this.SendCurlResult(writer, 0, RESULT_OK, url, originalFn, fs.Position);
+                }
+            }
+			catch (SystemException e)
+            {
+				this.SendCurlResult(writer, 1, e.ToString(), url, originalFn, 0L);
+			}
+			httpResponse.Close();
+		}
+
+		public void Fetch(String url, Stream writer, Stream reader, long bodyLen)
+        {
+			long contentLength = 0L;
+            try
+            {
+				HttpWebRequest httpRequest = (HttpWebRequest)WebRequest.Create(url);
+
+				httpRequest.AutomaticDecompression = DecompressionMethods.GZip;
+				httpRequest.ClientCertificates.Add(new System.Security.Cryptography.X509Certificates.X509Certificate());
+
+
+				this.setHeaders(this.ReadHeaderField(reader), httpRequest);
+
+
+				if (bodyLen != 0) reader.CopyTo(httpRequest.GetRequestStream());
+
+				HttpWebResponse httpResponse = (HttpWebResponse)httpRequest.GetResponse();
+
+
+				String head =
+					$"HTTP/{httpResponse.ProtocolVersion.ToString()} {((int)httpResponse.StatusCode)} {httpResponse.StatusDescription}\r\n" +
+					httpResponse.Headers.ToString();
+				byte[] headByte = Encoding.UTF8.GetBytes(head);
+				writer.Write(headByte, 0, headByte.Length);
+				contentLength += headByte.Length;
+
+				Stream responseStream = httpResponse.GetResponseStream();
+				contentLength += FileOperation.CopyStream(responseStream, writer, 0, 0, long.MaxValue);
+
+				byte[] result = new FileResult(0, RESULT_OK, contentLength).getBytes();
+				writer.Write(result, 0, result.Length);
+			}
+			catch(SystemException e)
+            {
+				byte[] result = new FileResult(1, e.ToString(), 0L).getBytes();
+				writer.Write(result, 0, result.Length);
+			}
+		}
+
+		public FileResult SetAttribute(String path, bool setReadOnly, bool readOnly, long lastModifiedTime, long lastAccessTime, long createTime, byte[] toSetTime)
+        {
+			path = Path.GetFullPath(path);
+
+            try
+            {
+				
+				if (setReadOnly)
+				{
+					if (readOnly) File.SetAttributes(path, File.GetAttributes(path) | FileAttributes.ReadOnly);
+					else File.SetAttributes(path, File.GetAttributes(path) & ~FileAttributes.ReadOnly);
+				}
+
+				if (Directory.Exists(path))
+                {
+					if (toSetTime[0] == 1) Directory.SetLastWriteTimeUtc(path, StartDateTime.AddMilliseconds(lastModifiedTime).ToUniversalTime());
+					if (toSetTime[1] == 1) Directory.SetLastAccessTimeUtc(path, StartDateTime.AddMilliseconds(lastAccessTime).ToUniversalTime());
+					if (toSetTime[2] == 1) Directory.SetCreationTimeUtc(path, StartDateTime.AddMilliseconds(lastAccessTime).ToUniversalTime());
+				}
+                else
+                {
+					if (toSetTime[0] == 1) File.SetLastWriteTimeUtc(path, StartDateTime.AddMilliseconds(lastModifiedTime).ToUniversalTime());
+					if (toSetTime[1] == 1) File.SetLastAccessTimeUtc(path, StartDateTime.AddMilliseconds(lastAccessTime).ToUniversalTime());
+					if (toSetTime[2] == 1) File.SetCreationTimeUtc(path, StartDateTime.AddMilliseconds(lastAccessTime).ToUniversalTime());
+				}
+				return new FileResult(0, RESULT_OK);
+			}
+			catch(SystemException e)
+            {
+				return new FileResult(1, e.ToString());
 			}
 		}
 	}

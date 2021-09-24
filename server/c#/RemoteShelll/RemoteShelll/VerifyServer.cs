@@ -20,6 +20,7 @@ namespace RemoteShelll
         }
         public void resetContext()
         {
+            this.AutoClose = true;
             this.responseData = new byte[0];
             this._isResponseDataEncrypted = false;
         }
@@ -68,6 +69,7 @@ namespace RemoteShelll
         internal AesCtr aesDecrypt;
         internal Stream writer;
         internal Stream reader;
+        internal bool AutoClose = true;
     }
 
     abstract class VerifyServer
@@ -360,6 +362,12 @@ namespace RemoteShelll
             context.resetContext();
             this.OnRequest(context, request, response);
             context.BeforeSend(response);
+
+            if (context.AutoClose)
+            {
+                request.InputStream.Close();
+                response.OutputStream.Close();
+            }
         }
 
         public abstract void OnRequest(ConnectContext context, HttpListenerRequest request, HttpListenerResponse response);
@@ -391,6 +399,8 @@ namespace RemoteShelll
                 {
                     if (useSecure) this.EstablishSecureConnect(request, response);
                     else this.EstablishNormalConnect(request, response);
+                    request.InputStream.Close();
+                    response.OutputStream.Close();
                 }
                 else
                 {
@@ -403,6 +413,9 @@ namespace RemoteShelll
                 response.StatusCode = 401;
                 byte[] responseData = Encoding.UTF8.GetBytes("Invalid token.");
                 response.OutputStream.Write(responseData, 0, responseData.Length);
+
+                request.InputStream.Close();
+                response.OutputStream.Close();
             }
 
         }
@@ -425,17 +438,24 @@ namespace RemoteShelll
             this.KeepRunning = true;
             while (this.KeepRunning)
             {
-                HttpListenerContext httpContext = this.HttpServer.GetContext();
-                HttpListenerRequest request = httpContext.Request;
-                HttpListenerResponse response = httpContext.Response;
+                this.HttpServer.BeginGetContext(new AsyncCallback(this.ListenerCallback), this.HttpServer).AsyncWaitHandle.WaitOne(2000, true);
+                //HttpListenerContext httpContext = this.HttpServer.GetContext();
+                //HttpListenerRequest request = httpContext.Request;
+                //HttpListenerResponse response = httpContext.Response;
 
-                this.OnRequest(request, response);
+                //this.OnRequest(request, response);
 
-                request.InputStream.Close();
-                response.OutputStream.Close();
-                //TODO: Close string
             }
             this.HttpServer.Close();
+        }
+        private void ListenerCallback(IAsyncResult result)
+        {
+            HttpListener listener = (HttpListener)result.AsyncState;
+            HttpListenerContext httpContext = listener.EndGetContext(result);
+            HttpListenerRequest request = httpContext.Request;
+            HttpListenerResponse response = httpContext.Response;
+
+            this.OnRequest(request, response);
         }
 
         public void Close()

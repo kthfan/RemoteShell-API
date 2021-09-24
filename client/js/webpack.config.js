@@ -12,8 +12,7 @@ module.exports = (env, argv) => {
       path: path.resolve(__dirname, env.build == "test" ? './test/dist' : './dist'),
       library: "test"
     },
-  //  mode: 'development',
-  //  devtool: false,
+   mode: env.dev ? 'development' : "production",
     resolve: {
       extensions: [".js", ".jsx", ".ts", ".json"]
     },
@@ -34,7 +33,8 @@ module.exports = (env, argv) => {
       ]
     }
   };
-
+  if(env.dev) result.devtool = false;
+  
   if(env.build=="test"){
     result.plugins = [
       new HtmlWebpackPlugin({
@@ -44,7 +44,7 @@ module.exports = (env, argv) => {
       }),
       new InlineChunkHtmlPlugin(HtmlWebpackPlugin, [/.js/]),
     ];
-    result.optimization = {
+    if(!env.dev) result.optimization = {
       minimize: true,
       minimizer: [
          new TerserPlugin(),

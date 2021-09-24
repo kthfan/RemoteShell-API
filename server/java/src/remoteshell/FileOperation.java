@@ -609,7 +609,7 @@ public class FileOperation {
 	private void sendCurlResult(ByteSender writer, int errCode, String msg, String url, String fn, long contentLength) {
 		this.doLock(curlLock, a->{
 			writer.send(new FileResult(errCode, msg, url).getBytes());
-			writer.send(FileSystemServer.getBytesFromShort((short) fn.length()));
+			writer.send(FileSystemServer.getBytesFromShort((short) fn.getBytes().length));
 			writer.send(fn.getBytes());
 			writer.send(FileSystemServer.getBytesFromLong(contentLength));
 			return null;
@@ -775,29 +775,7 @@ public class FileOperation {
 		} catch (IOException e) {
 			e.printStackTrace();
 			return new FileResult(1, e.toString());
-		}
-		
-		
-		
+		}	
 	}
 	
-	public void test(String path, ByteSender writer, ByteIterator reader) {
-		HttpServer.Request request = new HttpServer.Request();
-		request.parseRequest(reader);
-		try {
-			URL url = new URL("http://127.0.0.1/");
-			URLConnection connection = url.openConnection();
-			ReadableByteChannel readableBC = null;
-			readableBC = Channels.newChannel(url.openStream());
-//			connection.setDoOutput(true);
-//			connection.setDoInput(true);
-			ByteBuffer bb = ByteBuffer.allocate(1024);
-			readableBC.read(bb);
-			writer.send(new FileResult(0, RESULT_OK, new String(bb.array())).getBytes());
-		} catch (IOException e) {
-			e.printStackTrace();
-			writer.send(new FileResult(1, e.toString(), "").getBytes());
-		}
-		
-	}
 }

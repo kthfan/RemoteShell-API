@@ -147,7 +147,7 @@ export class RemoteFile{
     }
     _readRange(position, length){
         this._pushOperationBuffer([
-            RemoteFile.OPERATION_READ_ALL,
+            RemoteFile.OPERATION_READ_RANGE,
             this._idBytes.slice(),
             longToByteArray(position),
             longToByteArray(length)
@@ -488,7 +488,7 @@ export class FileSystemClient{
         var requestNumbers = shortToByteArray(downloadOpts.length);
         req.push(requestNumbers);
         // var i=0;
-        console.log(downloadOpts);
+       
         for(var {fileName, url, opt} of downloadOpts){
             var fn = fileName;
             var opt = opt ?? getDefaultHttpRequest(url);

@@ -72,7 +72,7 @@ namespace RemoteShelll
 			long result = 0L;
 			for (int i = 0; i < bytes.Length; i++)
 			{
-				result += (bytes[i] & 0xff) << (i << 3);
+				result += (long) (bytes[i] & 0xff) << (i << 3);
 			}
 			return result;
 		}
@@ -169,6 +169,7 @@ namespace RemoteShelll
 					case OPERATION_TRANSFER_RANGE:
 						int destIdLen = reader.ReadByte() & 0xff;
 						idBytes = new byte[destIdLen];
+						reader.Read(idBytes, 0, destIdLen);
 						String destId = Encoding.UTF8.GetString(idBytes);
 						FileStream destFileChannel;
 						this.fileMap.TryGetValue(destId, out destFileChannel);
@@ -184,6 +185,7 @@ namespace RemoteShelll
 						Console.WriteLine("Error occurred in FileSystemServer.doFileOperation. Code: " + mode);
 						break;
 				}
+				nextByte = reader.ReadByte();
 			}
 
 		}
@@ -202,6 +204,7 @@ namespace RemoteShelll
 			byte code = (byte)reader.ReadByte();
 			MemoryStream memoryReader;
 			FileResult fileResult;
+			byte[] buffer;
 			switch (code)
 			{
 				case CWD:
@@ -266,44 +269,60 @@ namespace RemoteShelll
                 case FILE_STATE_SIMPLE:
                     context.SetResponseData(fileOperation.FileStateSimple(Encoding.UTF8.GetString(this.ReadRemaining(reader))).getBytes());
                     break;
-                //case CURL:
-                //	response.setAutoClose(false);
-                //	response.sendHeader();
-                //	fileOperation.curl(reader, writer, socket.getChannel());
-                //	break;
-                //case FETCH:
-                //	response.sendHeader();
-                //	short urlLen = FileSystemServer.getShortFromBytes(reader.nextBytes(2));
-                //	String url = new String(reader.nextBytes(urlLen));
-                //	long bodyLen = FileSystemServer.getLongFromBytes(reader.nextBytes(8));
-                //	fileOperation.fetch(url, writer, reader, bodyLen);
-                //	break;
-                //case SET_ATTRIBUTE:
-                //	short pathLen = FileSystemServer.getShortFromBytes(reader.nextBytes(2));
-                //	String path = new String(reader.nextBytes(pathLen));
-                //	boolean setReadOnly = reader.nextByte() == 1;
-                //	boolean readOnly = reader.nextByte() == 1;
-                //	byte[] toSetTime = reader.nextBytes(3);
-                //	FileTime lastModifiedTime = null;
-                //	FileTime lastAccessTime = null;
-                //	FileTime createTime = null;
-                //	if (toSetTime[0] == 1)
-                //	{
-                //		lastModifiedTime = FileTime.fromMillis(FileSystemServer.getLongFromBytes(reader.nextBytes(8)));
-                //	}
-                //	else reader.nextBytes(8);
-                //	if (toSetTime[1] == 1)
-                //	{
-                //		lastAccessTime = FileTime.fromMillis(FileSystemServer.getLongFromBytes(reader.nextBytes(8)));
-                //	}
-                //	else reader.nextBytes(8);
-                //	if (toSetTime[2] == 1)
-                //	{
-                //		createTime = FileTime.fromMillis(FileSystemServer.getLongFromBytes(reader.nextBytes(8)));
-                //	}
-                //	else reader.nextBytes(8);
-                //	context.setResponseData(fileOperation.setAttribute(path, setReadOnly, readOnly, lastModifiedTime, lastAccessTime, createTime).getBytes());
-                //	break;
+                case CURL:
+					//response.setAutoClose(false);
+					//response.sendHeader();
+					context.AutoClose = false;
+                    fileOperation.curl(reader, writer, request, response);
+                    break;
+                case FETCH:
+					// response.sendHeader();
+					buffer = new byte[2];
+					reader.Read(buffer, 0, 2);
+					short urlLen = FileSystemServer.getShortFromBytes(buffer);
+					buffer = new byte[urlLen];
+					reader.Read(buffer, 0, urlLen);
+					String url = Encoding.UTF8.GetString(buffer);
+					buffer = new byte[8];
+					reader.Read(buffer, 0, 8);
+					long bodyLen = FileSystemServer.getLongFromBytes(buffer);
+                    fileOperation.Fetch(url, writer, reader, bodyLen);
+                    break;
+                case SET_ATTRIBUTE:
+					buffer = new byte[2];
+					reader.Read(buffer, 0, 2);
+					short pathLen = FileSystemServer.getShortFromBytes(buffer);
+					buffer = new byte[pathLen];
+					reader.Read(buffer, 0, pathLen);
+					String path = Encoding.UTF8.GetString(buffer);
+                	bool setReadOnly = reader.ReadByte() == 1;
+                	bool readOnly = reader.ReadByte() == 1;
+					byte[] toSetTime = new byte[3];
+					reader.Read(toSetTime, 0, 3);
+					long lastModifiedTime = 0L;
+					long lastAccessTime = 0L;
+					long createTime = 0L;
+					buffer = new byte[8];
+					if (toSetTime[0] == 1)
+                	{
+						reader.Read(buffer, 0, 8);
+						lastModifiedTime = FileSystemServer.getLongFromBytes(buffer);
+                	}
+                	else reader.Read(buffer, 0, 8);
+					if (toSetTime[1] == 1)
+                	{
+						reader.Read(buffer, 0, 8);
+						lastAccessTime = FileSystemServer.getLongFromBytes(buffer);
+                	}
+                	else reader.Read(buffer, 0, 8);
+					if (toSetTime[2] == 1)
+                	{
+						reader.Read(buffer, 0, 8);
+						createTime = FileSystemServer.getLongFromBytes(buffer);
+                	}
+                	else reader.Read(buffer, 0, 8);
+					context.SetResponseData(fileOperation.SetAttribute(path, setReadOnly, readOnly, lastModifiedTime, lastAccessTime, createTime, toSetTime).getBytes());
+                	break;
                 //case 0:
                 //	response.sendHeader();
                 //	fileOperation.test("", writer, reader);

@@ -289,10 +289,7 @@ public class FileSystemServer extends VerifyServer{
 			}else reader.nextBytes(8);
 			context.setResponseData(fileOperation.setAttribute(path, setReadOnly, readOnly, lastModifiedTime, lastAccessTime, createTime).getBytes());
 			break;
-		case 0:
-			response.sendHeader();
-			fileOperation.test("", writer, reader);
-			break;
+//		
 		default:
 			System.out.println("Error occurred in FileSystemServer.onRequest. Code: "+ code);
 			break;
