@@ -220,6 +220,7 @@ namespace RemoteShelll
             String host = hosts[0];
 
             List<ConnectContext> contextList;
+            
             contextByHostMap.TryGetValue(host, out contextList);
             if (contextList.Count == 1)
             {
@@ -244,7 +245,7 @@ namespace RemoteShelll
         }
         private void AddContextByHost(HttpListenerRequest request, ConnectContext context)
         {
-            String[] hosts = request.Headers.GetValues("Hosts") ?? new string[] {"*"};
+            String[] hosts = request.Headers.GetValues("Host") ?? new string[] {"*"};
             String host = hosts[0];
             if (!contextByHostMap.ContainsKey(host))
             {

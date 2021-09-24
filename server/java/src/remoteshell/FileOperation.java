@@ -13,6 +13,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SocketChannel;
+import java.nio.channels.WritableByteChannel;
 import java.nio.file.FileStore;
 import java.nio.file.Files;
 import java.nio.file.OpenOption;
@@ -146,7 +147,8 @@ public class FileOperation {
 		
 		public byte[] getBytes(){
 			byte[] result = null;
-			int messageLen = this.message.length();
+			int messageLen = this.message.getBytes().length;
+			byte[] messageLenBytes = FileSystemServer.getBytesFromShort((short) messageLen);
 			byte[] data = new byte[0];
 			int dataLen = 0;
 			if(this.strPayload != null) {
@@ -159,14 +161,18 @@ public class FileOperation {
 				data = FileSystemServer.getBytesFromLong(this.longPayload);
 			}
 			dataLen = data.length;
-			result = new byte[2 + messageLen + 8 + dataLen];
+			result = new byte[3 + messageLen + 8 + dataLen];
 			
 			result[0] = this.errorCode; // set error code
-			result[1] = (byte) this.message.length(); // set message length
-			System.arraycopy(this.message.getBytes(), 0, result, 2, messageLen); // set message
 			
-			System.arraycopy(FileSystemServer.getBytesFromLong(dataLen), 0, result, 2 + messageLen, 8); // set data length
-			System.arraycopy(data, 0, result, 2 + messageLen + 8, dataLen); // set data
+			// set message length
+			result[1] = messageLenBytes[0]; 
+			result[2] = messageLenBytes[1]; 
+			
+			System.arraycopy(this.message.getBytes(), 0, result, 3, messageLen); // set message
+			
+			System.arraycopy(FileSystemServer.getBytesFromLong(dataLen), 0, result, 3 + messageLen, 8); // set data length
+			System.arraycopy(data, 0, result, 3 + messageLen + 8, dataLen); // set data
 			
 			return result;
 		}
@@ -176,6 +182,7 @@ public class FileOperation {
 	public final static String RESULT_FAIL = "Fail.";
 	public final static String RESULT_NOT_EXISTS = "File not exists.";
 	public final static String RESULT_PERMISSION_DENIED = "Permission denied.";
+	public final static String RESULT_INVALID_DIRECTORY = "Invalid directory name.";
 	private String _cwd;
 	private Set<String> allowedPath = new HashSet<String>();
 	
@@ -242,31 +249,31 @@ public class FileOperation {
         }
 		return result;
 	}
-	private String checkFile(Path path, String str) {
-		if(!this.isPathAllow(str)) return RESULT_PERMISSION_DENIED;
-		if(!Files.exists(path)) return RESULT_NOT_EXISTS;
-		return RESULT_OK;
-	}
-	private String checkReadFile(Path path, String str) {
-		if(!this.isPathAllow(str)) return RESULT_PERMISSION_DENIED;
-		if(!Files.exists(path)) return RESULT_NOT_EXISTS;
-		if(Files.isDirectory(path)) {
-			if(!Files.isReadable(path) || !Files.isExecutable(path)) return RESULT_PERMISSION_DENIED;
-		}else {
-			if(!Files.isReadable(path)) return RESULT_PERMISSION_DENIED;
-		}
-		return RESULT_OK;
-	}
-	private String checkWriteFile(Path path, String str) {
-		if(!this.isPathAllow(str)) return RESULT_PERMISSION_DENIED;
-		if(!Files.exists(path)) return RESULT_NOT_EXISTS;
-		if(Files.isDirectory(path)) {
-			if(!Files.isReadable(path) || !Files.isWritable(path) || !Files.isExecutable(path)) return RESULT_PERMISSION_DENIED;
-		}else {
-			if(!Files.isWritable(path)) return RESULT_PERMISSION_DENIED;
-		}
-		return RESULT_OK;
-	}
+//	private String checkFile(Path path, String str) {
+//		if(!this.isPathAllow(str)) return RESULT_PERMISSION_DENIED;
+//		if(!Files.exists(path)) return RESULT_NOT_EXISTS;
+//		return RESULT_OK;
+//	}
+//	private String checkReadFile(Path path, String str) {
+//		if(!this.isPathAllow(str)) return RESULT_PERMISSION_DENIED;
+//		if(!Files.exists(path)) return RESULT_NOT_EXISTS;
+//		if(Files.isDirectory(path)) {
+//			if(!Files.isReadable(path) || !Files.isExecutable(path)) return RESULT_PERMISSION_DENIED;
+//		}else {
+//			if(!Files.isReadable(path)) return RESULT_PERMISSION_DENIED;
+//		}
+//		return RESULT_OK;
+//	}
+//	private String checkWriteFile(Path path, String str) {
+//		if(!this.isPathAllow(str)) return RESULT_PERMISSION_DENIED;
+//		if(!Files.exists(path)) return RESULT_NOT_EXISTS;
+//		if(Files.isDirectory(path)) {
+//			if(!Files.isReadable(path) || !Files.isWritable(path) || !Files.isExecutable(path)) return RESULT_PERMISSION_DENIED;
+//		}else {
+//			if(!Files.isWritable(path)) return RESULT_PERMISSION_DENIED;
+//		}
+//		return RESULT_OK;
+//	}
 	
 	private String toAbsolutePath(String path) {
 		path = path.replaceAll("\\\\", "/");
@@ -298,10 +305,9 @@ public class FileOperation {
 		path = this.toAbsolutePath(path);
 		Path dir = Paths.get(path);
 		
-		String msg = this.checkReadFile(dir, path);
-		if(msg.compareTo(RESULT_OK) != 0) return new FileResult(1, msg);
+		if(!this.isPathAllow(path)) return new FileResult(1, RESULT_PERMISSION_DENIED);
 		
-		if(!Files.isDirectory(dir)) return new FileResult(1, "Not a directory.");
+		if(!Files.isDirectory(dir)) return new FileResult(1, RESULT_INVALID_DIRECTORY + " Path:" + path);
 		this._cwd = path;
 		this._cwd = this._cwd.replaceAll("\\\\", "/");
 		if(!this._cwd.endsWith("/")) this._cwd += "/";
@@ -315,9 +321,9 @@ public class FileOperation {
 		path = this.toAbsolutePath(path);
 		Path dir = Paths.get(path);
 		
-		String msg = this.checkReadFile(dir, path);
-		if(msg.compareTo(RESULT_OK) != 0) return new FileResult(1, msg, new FileAttr[0]);
-		if(!Files.isDirectory(dir)) return new FileResult(1, "Not a directory.", new FileAttr[0]);
+		if(!this.isPathAllow(path)) return new FileResult(1, RESULT_PERMISSION_DENIED);
+		
+		if(!Files.isDirectory(dir)) return new FileResult(1, RESULT_INVALID_DIRECTORY + " Path:" + path, new FileAttr[0]);
 		
 		List<FileAttr> list = new ArrayList<FileAttr>();
 		try {
@@ -335,8 +341,7 @@ public class FileOperation {
 		path = this.toAbsolutePath(path);
 		Path dir = Paths.get(path);
 		
-		String msg = this.checkReadFile(dir, path);
-		if(msg.compareTo(RESULT_OK) != 0) return new FileResult(1, msg);
+		if(!this.isPathAllow(path)) return new FileResult(1, RESULT_PERMISSION_DENIED);
 		
 		try {
 			return Files.deleteIfExists(dir) ? new FileResult(0, RESULT_OK) : new FileResult(1, RESULT_FAIL);
@@ -349,8 +354,7 @@ public class FileOperation {
 		path = this.toAbsolutePath(path);
 		Path dir = Paths.get(path);
 		
-		String msg = this.checkWriteFile(dir, path);
-		if(msg.compareTo(RESULT_OK) != 0) return new FileResult(1, msg);
+		if(!this.isPathAllow(path)) return new FileResult(1, RESULT_PERMISSION_DENIED);
 		
 		FileResult result = new FileResult(0, RESULT_OK);
 		try {
@@ -380,8 +384,7 @@ public class FileOperation {
 		path = this.toAbsolutePath(path);
 		Path dir = Paths.get(path);
 		
-		String msg = this.checkWriteFile(dir.getParent(), this.getParentPath(path));
-		if(msg.compareTo(RESULT_OK) != 0) return new FileResult(1, msg);
+		if(!this.isPathAllow(path)) return new FileResult(1, RESULT_PERMISSION_DENIED);
 		
 		try {
 			Files.createDirectories(dir);
@@ -394,8 +397,7 @@ public class FileOperation {
 		path = this.toAbsolutePath(path);
 		Path file = Paths.get(path);
 		
-		String msg = this.checkWriteFile(file.getParent(), this.getParentPath(path));
-		if(msg.compareTo(RESULT_OK) != 0) return new FileResult(1, msg);
+		if(!this.isPathAllow(path)) return new FileResult(1, RESULT_PERMISSION_DENIED);
 		
 		try {
 			Files.createFile(file);
@@ -410,14 +412,8 @@ public class FileOperation {
 		Path fromPath = Paths.get(from);
 		Path toPath = Paths.get(to);
 		
-		String msg = this.checkReadFile(fromPath, from);
-		if(msg.compareTo(RESULT_OK) != 0) return new FileResult(1, msg);
-		msg = this.checkWriteFile(toPath, to);
-		if(msg.compareTo(RESULT_OK) != 0) return new FileResult(1, msg);
-		msg = this.checkWriteFile(fromPath.getParent(), this.getParentPath(from));
-		if(msg.compareTo(RESULT_OK) != 0) return new FileResult(1, msg);
-		msg = this.checkWriteFile(toPath.getParent(), this.getParentPath(to));
-		if(msg.compareTo(RESULT_OK) != 0) return new FileResult(1, msg);
+		if(!this.isPathAllow(from)) return new FileResult(1, RESULT_PERMISSION_DENIED);
+		if(!this.isPathAllow(to)) return new FileResult(1, RESULT_PERMISSION_DENIED);
 		
 		try {
 			Files.move(fromPath, toPath, StandardCopyOption.REPLACE_EXISTING );
@@ -430,11 +426,13 @@ public class FileOperation {
 	public FileResult fileStateSimple(String path) {
 		path = this.toAbsolutePath(path);
 		Path file = Paths.get(path);
+		if(!this.isPathAllow(path)) return new FileResult(1, RESULT_PERMISSION_DENIED);
 		return this.fileStateSimple(file);
 	}
 	public FileResult fileState(String path) {
 		path = this.toAbsolutePath(path);
 		Path file = Paths.get(path);
+		if(!this.isPathAllow(path)) return new FileResult(1, RESULT_PERMISSION_DENIED);
 		return this.fileState(file);
 	}
 	public FileResult fileStateSimple(Path path) {
@@ -485,19 +483,8 @@ public class FileOperation {
 	public FileResult openFile(String path, OpenOption... opts) {
 		path = this.toAbsolutePath(path);
 		Path file = Paths.get(path);
-		List<String> msgList = new ArrayList<String>();
 		
-		Set<OpenOption> optsSet = new HashSet<OpenOption>(Arrays.asList(opts));
-		if(!optsSet.contains(StandardOpenOption.CREATE) && !optsSet.contains(StandardOpenOption.CREATE_NEW)) {
-			if(optsSet.contains(StandardOpenOption.READ)) msgList.add(this.checkReadFile(file, path));
-			if(optsSet.contains(StandardOpenOption.WRITE)) msgList.add(this.checkWriteFile(file, path));
-		}
-		if(optsSet.contains(StandardOpenOption.CREATE) || optsSet.contains(StandardOpenOption.CREATE_NEW) || optsSet.contains(StandardOpenOption.DELETE_ON_CLOSE)) {
-			msgList.add(this.checkWriteFile(file.getParent(), this.getParentPath(path)));
-		}
-		for(String msg:msgList) {
-			if(msg.compareTo(RESULT_OK) != 0) return new FileResult(1, msg);
-		}
+		if(!this.isPathAllow(path)) return new FileResult(1, RESULT_PERMISSION_DENIED);
 		
 		FileChannel fileChannel = null;
 		try {
@@ -615,28 +602,66 @@ public class FileOperation {
 			return null;
 		}, null);
 	}
+	private long _transferChannel(ReadableByteChannel src, WritableByteChannel dest, long count) throws IOException {
+		if(count == 0) return 0L;
+		long total = 0;
+
+		ByteBuffer bb = ByteBuffer.allocate(32768);
+		do {
+			if(count - total < 32768) {
+				bb = ByteBuffer.allocate((int) (count - total));
+				src.read(bb);
+				total += bb.position();
+				bb.flip();
+				dest.write(bb);
+				break;
+			}
+			src.read(bb);
+			if(bb.position() == 0) {
+				break;
+			}
+			total += bb.position();
+			bb.flip();
+			dest.write(bb);
+			bb.clear();
+		}while(true);
+		
+		return total;
+	}
+	private class EmptyChannel implements WritableByteChannel{
+		@Override
+		public boolean isOpen() {	return true;}
+		@Override
+		public void close() throws IOException {}
+		@Override
+		public int write(ByteBuffer src) throws IOException {
+			src.position(src.limit());
+			return src.limit();
+		}
+		
+	}
+	
 	public Callable _curl(String url, String fn, ByteIterator reader, ByteSender writer, long bodyLen){
 		long[] contentLength = new long[] {0L};
 		final String fileName = this.toAbsolutePath(fn);
 		Path file = Paths.get(fileName);
 		
-		String msg = this.checkWriteFile(file.getParent(), this.getParentPath(fileName));
-		if(msg.compareTo(RESULT_OK) != 0) {
-			this.sendCurlResult(writer, 1, msg, url, fileName, 0L);
-			return null;
-		}
-		if(Files.exists(file)) {
-			this.sendCurlResult(writer, 1, "File already exists.", url, fileName, 0L);
-			return null;
-		}
-		
 		//solve request
 		HttpServer.Request request = new HttpServer.Request();
 		request.parseRequest(reader);
-
+		
+		
+		boolean isBodyFlushed = false;
+		
 		Map<String, String> headers = request.getHeaders();
 		
 		try {
+			if(!this.isPathAllow(fileName)) {
+				if(bodyLen != 0) this._transferChannel(reader, new EmptyChannel(), bodyLen);
+				this.sendCurlResult(writer, 1, RESULT_PERMISSION_DENIED, url, fileName, 0L);
+				return null;
+			}
+			
 			URL urlObj = new URL(url);
 			HttpURLConnection connection = (HttpURLConnection) urlObj.openConnection();
 			//method
@@ -650,7 +675,10 @@ public class FileOperation {
 			connection.setDoInput(true);
 			if(bodyLen != 0) {
 				connection.setDoOutput(true);
-				connection.getOutputStream().write(reader.nextBytes((int) bodyLen));
+				this._transferChannel(reader, Channels.newChannel(connection.getOutputStream()), bodyLen);
+				
+//				connection.getOutputStream().write(reader.nextBytes((int) bodyLen));
+				isBodyFlushed = true;
 			}
 			
 //			this.executorService.execute(new Thread(()-> {
@@ -661,9 +689,9 @@ public class FileOperation {
 					contentLength[0] = fileChannel.transferFrom(readableBC, 0, Long.MAX_VALUE);
 					fileChannel.close();
 					readableBC.close();
-					this.sendCurlResult(writer, 0, RESULT_OK, url, fileName, contentLength[0]);
+					this.sendCurlResult(writer, 0, RESULT_OK, url, fn, contentLength[0]);
 				} catch (IOException e) {
-					this.sendCurlResult(writer, 1, e.toString(), url, fileName, contentLength[0]);
+					this.sendCurlResult(writer, 1, e.toString(), url, fn, contentLength[0]);
 					e.printStackTrace();
 				}
 				return null;
@@ -671,10 +699,17 @@ public class FileOperation {
 //			}));
 			
 		} catch (IOException e1) {
-			this.sendCurlResult(writer, 1, e1.toString(), url, fileName, contentLength[0]);
+			if(!isBodyFlushed)
+				try {
+					this._transferChannel(reader, new EmptyChannel(), bodyLen);
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			this.sendCurlResult(writer, 1, e1.toString(), url, fn, contentLength[0]);
 			e1.printStackTrace();
+			return null;
 		}
-		return null;
+		
 	}
 	
 	public void fetch(String url, ByteSender writer, ByteIterator reader, long bodyLen) {
@@ -684,6 +719,7 @@ public class FileOperation {
 		//solve request
 		request.parseRequest(reader);
 		Map<String, String> headers = request.getHeaders();
+		boolean isBodyFlushed = false;
 		try {
 			URL urlObj = new URL(url);
 			HttpURLConnection connection = (HttpURLConnection) urlObj.openConnection();
@@ -697,7 +733,8 @@ public class FileOperation {
 			connection.setDoInput(true);
 			if(bodyLen != 0) {
 				connection.setDoOutput(true);
-				connection.getOutputStream().write(reader.nextBytes((int) bodyLen));
+				this._transferChannel(reader, Channels.newChannel(connection.getOutputStream()), bodyLen);
+				isBodyFlushed = true;
 			}
 			
 			readableBC = Channels.newChannel(urlObj.openStream());
@@ -733,6 +770,12 @@ public class FileOperation {
 			}while(true);
 			writer.send(new FileResult(0, RESULT_OK, contentLength).getBytes());
 		} catch (IOException e) {
+			if(!isBodyFlushed)
+				try {
+					this._transferChannel(reader, new EmptyChannel(), bodyLen);
+				} catch (IOException e1) {
+					e.printStackTrace();
+				}
 			e.printStackTrace();
 			writer.send(new FileResult(1, e.toString(), 0L).getBytes());
 		}
@@ -742,8 +785,7 @@ public class FileOperation {
 		path = this.toAbsolutePath(path);
 		Path file = Paths.get(path);
 		
-		String msg = this.checkFile(file, path);
-		if(msg.compareTo(RESULT_OK) != 0) return new FileResult(1, msg);
+		if(!this.isPathAllow(path)) return new FileResult(1, RESULT_PERMISSION_DENIED);
 		// Query file system
 		try {
 			FileStore fileStore = Files.getFileStore(file);

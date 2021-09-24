@@ -23,14 +23,7 @@ namespace RemoteShelll
 
             Console.ReadKey();
         }
-        class TestVerifyServer : VerifyServer
-        {
-            public TestVerifyServer(String token, ICollection<String> allowHosts, ICollection<int> ports) : base(token, allowHosts, ports) {}
-            public override void OnRequest(ConnectContext context, HttpListenerRequest request, HttpListenerResponse response)
-            {
-                
-            }
-        }
+
         public static void printArray(byte[] arr)
         {
             Console.WriteLine("[");

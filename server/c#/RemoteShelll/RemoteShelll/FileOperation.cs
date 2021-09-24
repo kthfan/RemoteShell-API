@@ -130,7 +130,9 @@ namespace RemoteShelll
 		public byte[] getBytes()
 		{
 			byte[] result = null;
-			int messageLen = this.message.Length;
+			byte[] messageBytes = Encoding.UTF8.GetBytes(this.message);
+			int messageLen = messageBytes.Length;
+			byte[] messageLenBytes = FileSystemServer.getBytesFromShort((short)messageLen);
 			byte[] data = new byte[0];
 			int dataLen = 0;
 			if (this.strPayload != null)
@@ -150,14 +152,18 @@ namespace RemoteShelll
 				data = FileSystemServer.getBytesFromLong(this.longPayload);
 			}
 			dataLen = data.Length;
-			result = new byte[2 + messageLen + 8 + dataLen];
+			result = new byte[3 + messageLen + 8 + dataLen];
 
 			result[0] = this.errorCode; // set error code
-			result[1] = (byte)this.message.Length; // set message length // fatal error: may cause memory leak
-			Array.Copy(Encoding.UTF8.GetBytes(this.message), 0, result, 2, messageLen); // set message
 
-			Array.Copy(FileSystemServer.getBytesFromLong(dataLen), 0, result, 2 + messageLen, 8); // set data length
-			Array.Copy(data, 0, result, 2 + messageLen + 8, dataLen); // set data
+			// set message length
+			result[1] = messageLenBytes[0];
+			result[2] = messageLenBytes[1];
+
+			Array.Copy(Encoding.UTF8.GetBytes(this.message), 0, result, 3, messageLen); // set message
+
+			Array.Copy(FileSystemServer.getBytesFromLong(dataLen), 0, result, 3 + messageLen, 8); // set data length
+			Array.Copy(data, 0, result, 3 + messageLen + 8, dataLen); // set data
 
 			return result;
 		}
@@ -168,6 +174,7 @@ namespace RemoteShelll
 		public readonly static String RESULT_FAIL = "Fail.";
 		public readonly static String RESULT_NOT_EXISTS = "File not exists.";
 		public readonly static String RESULT_PERMISSION_DENIED = "Permission denied.";
+		public readonly static String RESULT_INVALID_DIRECTORY = "Invalid directory name.";
 
 		internal DateTime StartDateTime = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
@@ -208,18 +215,6 @@ namespace RemoteShelll
 			this.AllowedPath.Remove(path);
 		}
 
-		private String GetParentPath(String path)
-		{
-			bool isDir = path.EndsWith("/");
-			if (isDir) path = path.Substring(0, path.Length - 1);
-
-			String[] splitPath = path.Split('/');
-			int splitCount = splitPath.Length;
-
-			String[] resultSplitPath = new string[splitCount - 1];
-			Array.Copy(splitPath, 0, resultSplitPath, 0, splitCount - 1);
-			return String.Join("/", resultSplitPath) + "/";
-		}
 		public bool IsPathAllow(String path)
 		{
 			String child = Path.GetFullPath(path);
@@ -264,12 +259,11 @@ namespace RemoteShelll
 			List<FileAttr> list = new List<FileAttr>();
 			try
             {
-				FileAttributes attr = File.GetAttributes(@path);
+				FileAttributes attr = File.GetAttributes(path);
 
 				if (!this.IsPathAllow(path)) return new FileResult(1, RESULT_PERMISSION_DENIED);
-				if (!attr.HasFlag(FileAttributes.Directory)) return new FileResult(1, "Not a directory.");
 				
-				DirectoryInfo d = new DirectoryInfo(@path);
+				DirectoryInfo d = new DirectoryInfo(path);
 				FileInfo[] infos = d.GetFiles();
 				DirectoryInfo[] dinfo = d.GetDirectories();
 				infos.ToList().ForEach(info => list.Add(this.FileState(info.FullName).attrPayload));
@@ -375,7 +369,7 @@ namespace RemoteShelll
 		public FileResult FileState(String path)
         {
 
-			//path = Path.GetFullPath(path);
+			path = Path.GetFullPath(path);
 			
 			if (!this.IsPathAllow(path)) return new FileResult(1, RESULT_PERMISSION_DENIED);
 
@@ -416,7 +410,6 @@ namespace RemoteShelll
 				}
 				
 			} catch (SystemException e) {
-				Console.WriteLine(e.ToString());
 				result.errorCode = 1;
 				result.message = e.ToString();
 			}
@@ -705,7 +698,7 @@ namespace RemoteShelll
                 long bodyLen = FileSystemServer.getLongFromBytes(bufferLong);
 
 
-                Task<WebResponse> task = this._curl(url, fn, reader, writer, bodyLen);
+                Task<WebResponse> task = this._curl(url, Path.GetFullPath(fn), reader, writer, bodyLen, fn);
                 if (task != null)
                 {
                     urlList.Add(url);
@@ -811,29 +804,43 @@ namespace RemoteShelll
 				else httpRequest.Headers.Add(headers[i][0], headers[i][1]);
 			}
 		}
-		private Task<WebResponse> _curl(String url, String fn, Stream reader, Stream writer, long bodyLen)
+		private void FlushStreamAsync(Stream stream, long length)
         {
-            try
-            {
-				HttpWebRequest httpRequest = (HttpWebRequest)WebRequest.Create(url);
+			if (length != 0) FileOperation.CopyStream(stream, new MemoryStream(), 0, 0, length);
+		}
+		private Task<WebResponse> _curl(String url, String fn, Stream reader, Stream writer, long bodyLen, String orginalFn)
+        {
+			List<String[]> headers = this.ReadHeaderField(reader);
+			HttpWebRequest httpRequest;
+			bool isBodyFlushed = false;
+
+			if (!this.IsPathAllow(fn))
+			{
+				this.FlushStreamAsync(reader, bodyLen);
+				this.SendCurlResult(writer, 1, RESULT_PERMISSION_DENIED, url, orginalFn, 0L);
+				return null;
+			}
+			try
+			{
+				httpRequest = (HttpWebRequest)WebRequest.Create(url);
 
 				httpRequest.AutomaticDecompression = DecompressionMethods.GZip;
 				httpRequest.ClientCertificates.Add(new System.Security.Cryptography.X509Certificates.X509Certificate());
 
-				this.setHeaders(this.ReadHeaderField(reader), httpRequest);
+				this.setHeaders(headers, httpRequest);
 
-
-				if (bodyLen != 0) reader.CopyTo(httpRequest.GetRequestStream());
+				if (bodyLen != 0) FileOperation.CopyStream(reader, httpRequest.GetRequestStream(), 0, 0, bodyLen);
+				isBodyFlushed = true;
 
 				//this._EndCurl((HttpWebResponse)httpRequest.GetResponse(), url, fn, writer);
 				return httpRequest.GetResponseAsync();
 			}
-            catch (SystemException e)
-            {
-				this.SendCurlResult(writer, 1, e.ToString(), url, fn, 0L);
+			catch (SystemException e)
+			{
+				if(!isBodyFlushed) this.FlushStreamAsync(reader, bodyLen);
+				this.SendCurlResult(writer, 1, e.ToString(), url, orginalFn, 0L);
 				return null;
-            }
-			return null;
+			}
 		}
 		private void SendCurlResult(Stream writer, int errCode, String msg, String url, String fn, long contentLength)
 		{
@@ -866,18 +873,23 @@ namespace RemoteShelll
 		public void Fetch(String url, Stream writer, Stream reader, long bodyLen)
         {
 			long contentLength = 0L;
-            try
+			List<String[]> headers = this.ReadHeaderField(reader);
+			HttpWebRequest httpRequest;
+			bool isBodyFlushed = false;
+
+			try
             {
-				HttpWebRequest httpRequest = (HttpWebRequest)WebRequest.Create(url);
+				httpRequest = (HttpWebRequest)WebRequest.Create(url);
 
 				httpRequest.AutomaticDecompression = DecompressionMethods.GZip;
 				httpRequest.ClientCertificates.Add(new System.Security.Cryptography.X509Certificates.X509Certificate());
 
 
-				this.setHeaders(this.ReadHeaderField(reader), httpRequest);
+				this.setHeaders(headers, httpRequest);
 
 
 				if (bodyLen != 0) reader.CopyTo(httpRequest.GetRequestStream());
+				isBodyFlushed = true;
 
 				HttpWebResponse httpResponse = (HttpWebResponse)httpRequest.GetResponse();
 
@@ -897,6 +909,7 @@ namespace RemoteShelll
 			}
 			catch(SystemException e)
             {
+				if (!isBodyFlushed) this.FlushStreamAsync(reader, bodyLen);
 				byte[] result = new FileResult(1, e.ToString(), 0L).getBytes();
 				writer.Write(result, 0, result.Length);
 			}

@@ -44,7 +44,7 @@ namespace RemoteShelll
         public override int Read(byte[] buffer, int offset, int count)
         {
             int result = this._stream.Read(buffer, offset, count);
-            this._aes.decrypt(buffer, offset, count, false);
+            this._aes.decrypt(buffer, offset, result, false);
             return result;
         }
 
@@ -68,8 +68,6 @@ namespace RemoteShelll
             using (MemoryStream memoryStream = new MemoryStream())
             {
                 stream.CopyTo(memoryStream);
-                Console.WriteLine(memoryStream.Position);
-                Console.WriteLine(memoryStream.Length);
                 return memoryStream.ToArray();
             }
         }

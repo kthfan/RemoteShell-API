@@ -274,7 +274,7 @@ namespace RemoteShelll
 					//response.sendHeader();
 					context.AutoClose = false;
                     fileOperation.curl(reader, writer, request, response);
-                    break;
+					break;
                 case FETCH:
 					// response.sendHeader();
 					buffer = new byte[2];

@@ -101,7 +101,7 @@ export class RemoteFile{
                 case RemoteFile.OPERATION_TRANSFER_RANGE:
                 case RemoteFile.OPERATION_APPEND:
                     payload = FileSystemClient._solveFileResult(arr.subarray(i), true);
-                    i += 2 + payload[1].length + 8;
+                    i += 3 + payload[1].length + 8;
                     payload[2] = byteArrayToLong(payload[2]);
                     payloadList.push(payload);
                     i += 8;
@@ -323,10 +323,10 @@ export class FileSystemClient{
 
     static _solveFileResult(arr, suppress = false){
         var errorCode = arr[0];
-        var messageLen = arr[1];
-        var message = arr.subarray(2, 2 + messageLen);
-        var payloadLen = byteArrayToLong(arr.subarray(2 + messageLen, 2 + messageLen + 8));
-        var payload = arr.subarray(2 + messageLen + 8 , 2 + messageLen + 8 + payloadLen);
+        var messageLen = byteArrayToShort(arr.subarray(1, 3));
+        var message = arr.subarray(3, 3 + messageLen);
+        var payloadLen = byteArrayToLong(arr.subarray(3 + messageLen, 3 + messageLen + 8));
+        var payload = arr.subarray(3 + messageLen + 8 , 3 + messageLen + 8 + payloadLen);
 
         message = RemoteFile._dec.decode(message);
         if(errorCode !== 0 && !suppress) throw message;
@@ -507,35 +507,41 @@ export class FileSystemClient{
             req.push(body);
             // i++;
         }
-        
-        return this.connectContext.request([
+        var resolveList = [];
+        var rejectList = [];
+        var responseList = downloadOpts.map(e=>{
+            return new Promise((resolve, reject)=>{
+                resolveList.push(resolve);
+                rejectList.push(reject);
+            });
+        })
+        this.connectContext.request([
             new Uint8Array([FileSystemClient.CURL]),
             ...req
         ]).then(arr=>{
+            var index = 0;
             var i=0;
-            var result = [];
             while(i<arr.byteLength){
-                result.push(new Promise((resolve, reject)=>{
-                    var payload = FileSystemClient._solveFileResult(arr.subarray(i), true);
-                    i += 2 + payload[1].length + 8 + payload[2].length;
-                    var fnLen = byteArrayToShort(arr.subarray(i, i+2));
-                    i += 2;
-                    var fileName = arr.subarray(i, i+fnLen);
-                    i += fnLen;
-                    var contentLength = byteArrayToLong(arr.subarray(i, i+8));
-                    i += 8;
-                    if(payload[0] === 0)
-                        resolve({
-                            url: this._dec.decode(payload[2]),
-                            fileName: this._dec.decode(fileName),
-                            contentLength
-                        });
-                    else 
-                        reject(payload[1]);
-                }));
+                var payload = FileSystemClient._solveFileResult(arr.subarray(i), true);
+                i += 3 + payload[1].length + 8 + payload[2].length;
+                var fnLen = byteArrayToShort(arr.subarray(i, i+2));
+                i += 2;
+                var fileName = arr.subarray(i, i+fnLen);
+                i += fnLen;
+                var contentLength = byteArrayToLong(arr.subarray(i, i+8));
+                i += 8;
+                if(payload[0] === 0)
+                    resolveList[index]({
+                        url: this._dec.decode(payload[2]),
+                        fileName: this._dec.decode(fileName),
+                        contentLength
+                    });
+                else 
+                    rejectList[index](payload[1]);
+                index++;                
             }
-            return result;
         });
+        return responseList;
     }
 
     /**
@@ -546,7 +552,7 @@ export class FileSystemClient{
      */
     fetch(url, opt=getDefaultHttpRequest(url)){
         var req = [];
-        var headers = buildHttpRequest(url, opt);
+        var [headers, body] = buildHttpRequest(url, opt);
 
         var urlLen = shortToByteArray(url.length);
         var bodyLen =  longToByteArray(opt.body?.length ?? 0);
@@ -557,7 +563,8 @@ export class FileSystemClient{
             urlLen,
             this._enc.encode(url),
             bodyLen,
-            this._enc.encode(headers)
+            this._enc.encode(headers),
+            body
         ]).then(arr=>{
             var contentLength = byteArrayToLong(arr.subarray(arr.byteLength-8, arr.byteLength));
             var payload = FileSystemClient._solveFileResult(arr.subarray(contentLength));

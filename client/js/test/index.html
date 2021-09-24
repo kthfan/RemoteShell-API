@@ -137,17 +137,11 @@
                         obj.url = args[i + 1];
                         arr.push(obj);
                     }
-                    return server.curl(...arr)
-                    .then(async arr => {
-                        var result = [];
-                        for(var p of arr){
-                            console.log(p);
-                            var e = await p;
-                            console.log(e);
-                            result.push(`${e.url} ${e.fileName} ${e.contentLength}`);
-                        }
-                        return result.join("\n");
-                    });
+                    return Promise.all(server.curl(...arr))
+                    .then(arr=>
+                        arr.map(e => `${e.url} ${e.fileName} ${e.contentLength}`)
+                        .join("\n")
+                    );
                 },
                 fetch(url){
                     return server.fetch(url)
