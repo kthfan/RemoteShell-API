@@ -46,7 +46,7 @@ import java.nio.channels.Channels;
 import java.util.HashSet;
 
 public class FileOperation {
-	class FileAttr{
+	static class FileAttr{
 		private final static String[] ATTR_NAMES = new String[] {"exists", "name", "fileType", "rwe", "size", "owner", "isHidden", "creationTime", "lastAccessTime", "modifiedTime"};
 		private final String[] attrs = new String[] {null, null, null, null, null, null, null, null, null, null};
 		public void setExists(boolean exists) {
@@ -102,7 +102,7 @@ public class FileOperation {
 			return result;
 		}
 	}
-	class FileResult{
+	static class FileResult{
 		public byte errorCode = 0;
 		public String message = "";
 		public Object payload = null;
@@ -332,9 +332,9 @@ public class FileOperation {
 			
 		} catch (IOException e) {
 			e.printStackTrace();
-			return new FileResult(1, e.toString(), list.toArray(FileAttr[]::new));
+			return new FileResult(1, e.toString(), list.toArray(new FileAttr[list.size()]));
 		}
-		return new FileResult(0, RESULT_OK, list.toArray(FileAttr[]::new));
+		return new FileResult(0, RESULT_OK, list.toArray(new FileAttr[list.size()]));
 	}
 	
 	public FileResult remove(String path) {

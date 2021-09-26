@@ -1,0 +1,7 @@
+C:\Users\acer\OneDrive\文件\JCreator Pro\RemoteShell-API\server\c#\RemoteShell\RemoteShell\bin\Debug\RemoteShell.exe.config
+C:\Users\acer\OneDrive\文件\JCreator Pro\RemoteShell-API\server\c#\RemoteShell\RemoteShell\bin\Debug\RemoteShell.exe
+C:\Users\acer\OneDrive\文件\JCreator Pro\RemoteShell-API\server\c#\RemoteShell\RemoteShell\bin\Debug\RemoteShell.pdb
+C:\Users\acer\OneDrive\文件\JCreator Pro\RemoteShell-API\server\c#\RemoteShell\RemoteShell\obj\Debug\RemoteShell.csproj.AssemblyReference.cache
+C:\Users\acer\OneDrive\文件\JCreator Pro\RemoteShell-API\server\c#\RemoteShell\RemoteShell\obj\Debug\RemoteShell.csproj.CoreCompileInputs.cache
+C:\Users\acer\OneDrive\文件\JCreator Pro\RemoteShell-API\server\c#\RemoteShell\RemoteShell\obj\Debug\RemoteShell.exe
+C:\Users\acer\OneDrive\文件\JCreator Pro\RemoteShell-API\server\c#\RemoteShell\RemoteShell\obj\Debug\RemoteShell.pdb

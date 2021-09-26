@@ -171,7 +171,7 @@ client.closeFile(file2); // The same as file2.close()
 ### Download from url:
 #### Download from url and save to files .
 ```javascript
-client.curl(
+Promise.all(client.curl(
   {
     fileName: "index.html", // File name to save downloaded.
     url: "http://localhost" // url to download
@@ -187,7 +187,7 @@ client.curl(
       }
     }
   }
-).then(resultList => {
+)).then(resultList => {
   resultList.forEach(result=>{
     console.log("File name:", result.fileName);
     console.log("URL:", result.url);

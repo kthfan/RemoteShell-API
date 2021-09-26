@@ -1,7 +1,0 @@
-C:\Users\acer\OneDrive\文件\JCreator Pro\RemoteShell-API\server\c#\RemoteShelll\RemoteShelll\bin\Debug\RemoteShelll.exe.config
-C:\Users\acer\OneDrive\文件\JCreator Pro\RemoteShell-API\server\c#\RemoteShelll\RemoteShelll\bin\Debug\RemoteShelll.exe
-C:\Users\acer\OneDrive\文件\JCreator Pro\RemoteShell-API\server\c#\RemoteShelll\RemoteShelll\bin\Debug\RemoteShelll.pdb
-C:\Users\acer\OneDrive\文件\JCreator Pro\RemoteShell-API\server\c#\RemoteShelll\RemoteShelll\obj\Debug\RemoteShelll.csproj.AssemblyReference.cache
-C:\Users\acer\OneDrive\文件\JCreator Pro\RemoteShell-API\server\c#\RemoteShelll\RemoteShelll\obj\Debug\RemoteShelll.csproj.CoreCompileInputs.cache
-C:\Users\acer\OneDrive\文件\JCreator Pro\RemoteShell-API\server\c#\RemoteShelll\RemoteShelll\obj\Debug\RemoteShelll.exe
-C:\Users\acer\OneDrive\文件\JCreator Pro\RemoteShell-API\server\c#\RemoteShelll\RemoteShelll\obj\Debug\RemoteShelll.pdb
